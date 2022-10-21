@@ -5,8 +5,8 @@
 @typescript-eslint/no-explicit-any: "off",
  */
 
-import type { Bin } from "d3";
 import {
+    Bin,
     extent,
     histogram,
     interpolateGreens,
@@ -25,8 +25,10 @@ import type { SearchDispatch, TableDatum } from "./graph-helpers";
 import { GraphRange } from "./graph-helpers";
 import type { HistogramData } from "./histogram-graph";
 
+type graphColumn = [number, number]
+
 export interface GraphData {
-    dueCounts: Map<number, number>;
+    dueCounts: Map<number, graphColumn>;
     haveBacklog: boolean;
 }
 
@@ -38,9 +40,12 @@ export function gatherData(data: Stats.GraphsResponse): GraphData {
         );
     };
     let haveBacklog = false;
+
+    let dueCounts = new Map<number, graphColumn>();
+
     const due = (data.cards as Cards.Card[])
         .filter((c: Cards.Card) => c.queue > 0)
-        .map((c: Cards.Card) => {
+        .forEach((c: Cards.Card) => {
             // - testing just odue fails on day 1
             // - testing just odid fails on lapsed cards that
             //   have due calculated at regraduation time
@@ -56,14 +61,13 @@ export function gatherData(data: Stats.GraphsResponse): GraphData {
 
             haveBacklog = haveBacklog || dueDay < 0;
 
-            return dueDay;
-        });
+            if(!dueCounts.has(dueDay)) {
+                dueCounts.set(dueDay, [0, 0])
+            }
 
-    const dueCounts = rollup(
-        due,
-        (v) => v.length,
-        (d) => d,
-    );
+            (dueCounts.get(dueDay)!)[c.interval >= 21 ? 0 : 1] += 1
+        });
+    
     return { dueCounts, haveBacklog };
 }
 
@@ -96,6 +100,9 @@ export function buildHistogram(
     const output = { histogramData: null, tableData: [] };
     // get min/max
     const data = sourceData.dueCounts;
+
+    console.log(JSON.stringify([...data.values()]))
+
     if (!data) {
         return output;
     }
@@ -181,7 +188,7 @@ export function buildHistogram(
         {
             label: tr.statisticsDueTomorrow(),
             value: tr.statisticsReviews({
-                reviews: sourceData.dueCounts.get(1) ?? 0,
+                reviews: sourceData.dueCounts.get(1)?.reduce((a,p)=>a+p) ?? 0,
             }),
         },
     ];
