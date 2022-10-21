@@ -105,7 +105,7 @@ export function histogramGraph(
             .attr("fill", (d) => data.colourScale(d.x1));
     };
 
-    svg.select("g.bars")
+    svg.select("g.bars0")
         .selectAll("rect")
         .data(data.bins)
         .join(

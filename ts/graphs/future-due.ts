@@ -8,7 +8,7 @@
 import {
     Bin,
     extent,
-    histogram,
+    bin,
     interpolateGreens,
     rollup,
     scaleLinear,
@@ -25,10 +25,10 @@ import type { SearchDispatch, TableDatum } from "./graph-helpers";
 import { GraphRange } from "./graph-helpers";
 import type { HistogramData } from "./histogram-graph";
 
-type graphColumn = [number, number]
+type GraphColumn = [number, number]
 
 export interface GraphData {
-    dueCounts: Map<number, graphColumn>;
+    dueCounts: Map<number, GraphColumn>;
     haveBacklog: boolean;
 }
 
@@ -41,7 +41,7 @@ export function gatherData(data: Stats.GraphsResponse): GraphData {
     };
     let haveBacklog = false;
 
-    let dueCounts = new Map<number, graphColumn>();
+    let dueCounts = new Map<number, GraphColumn>();
 
     const due = (data.cards as Cards.Card[])
         .filter((c: Cards.Card) => c.queue > 0)
@@ -65,14 +65,17 @@ export function gatherData(data: Stats.GraphsResponse): GraphData {
                 dueCounts.set(dueDay, [0, 0])
             }
 
-            (dueCounts.get(dueDay)!)[c.interval >= 21 ? 0 : 1] += 1
+            // 1 being mature, 0 being young
+            (dueCounts.get(dueDay)!)[c.interval >= 21 ? 1 : 0] += 1
         });
     
     return { dueCounts, haveBacklog };
 }
 
-function binValue(d: Bin<Map<number, number>, number>): number {
-    return sum(d, (d) => d[1]);
+function binValue(d: Bin<[number, GraphColumn], number>): number {
+    console.log(JSON.stringify(d))
+
+    return sum(d, (d) => d[1][0]);
 }
 
 export interface FutureDueResponse {
@@ -101,7 +104,7 @@ export function buildHistogram(
     // get min/max
     const data = sourceData.dueCounts;
 
-    console.log(JSON.stringify([...data.values()]))
+    console.log(JSON.stringify([...data.values()])) // TODO Remove
 
     if (!data) {
         return output;
@@ -132,7 +135,7 @@ export function buildHistogram(
     const desiredBars = Math.min(70, xMax! - xMin!);
 
     const x = scaleLinear().domain([xMin!, xMax!]);
-    const bins = histogram()
+    const bins = bin()
         .value((m) => {
             return m[0];
         })
