@@ -61,7 +61,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         <GraphRangeRadios bind:graphRange revlogRange={RevlogRange.All} />
     </InputBox>
 
-    <HistogramGraph data={histogramData} />
+    <HistogramGraph data={histogramData} layers={2}/>
 
     <TableData {tableData} />
 </Graph>
