@@ -21,7 +21,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 </script>
 
 <svg bind:this={svg} viewBox={`0 0 ${bounds.width} ${bounds.height}`}>
-    {#each [0] as layer}
+    {#each Array(layers).fill(0).map((_,i)=>layers-1-i) as layer}
         <g class="bars{layer}" />
     {/each}
     <HoverColumns />

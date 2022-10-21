@@ -73,8 +73,6 @@ export function gatherData(data: Stats.GraphsResponse): GraphData {
 }
 
 function binValue(d: Bin<[number, GraphColumn], number>): number {
-    console.log(JSON.stringify(d))
-
     return sum(d, (d) => d[1][0]);
 }
 
