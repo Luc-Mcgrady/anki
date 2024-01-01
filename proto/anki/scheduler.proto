@@ -368,6 +368,7 @@ message ComputeOptimalRetentionRequest {
   uint32 max_interval = 5;
   string search = 6;
   double loss_aversion = 7;
+  int64 ignore_before = 8;
 }
 
 message ComputeOptimalRetentionResponse {
@@ -391,6 +392,7 @@ message OptimalRetentionParameters {
 
 message GetOptimalRetentionParametersRequest {
   string search = 1;
+  int64 ignore_before = 2;
 }
 
 message GetOptimalRetentionParametersResponse {

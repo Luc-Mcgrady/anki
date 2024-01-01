@@ -195,6 +195,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
                     optimalRetentionRequest.maxInterval = $config.maximumReviewInterval;
                     optimalRetentionRequest.weights = $config.fsrsWeights;
                     optimalRetentionRequest.search = `preset:"${state.getCurrentName()}" -is:suspended`;
+                    optimalRetentionRequest.ignoreBefore = getIgnoreBefore();
                     const resp = await computeOptimalRetention(optimalRetentionRequest);
                     optimalRetention = resp.optimalRetention;
                     computeRetentionProgress = undefined;

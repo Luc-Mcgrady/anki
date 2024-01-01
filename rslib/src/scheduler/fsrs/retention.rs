@@ -8,6 +8,7 @@ use fsrs::FSRS;
 use itertools::Itertools;
 
 use crate::prelude::*;
+use crate::revlog::RemoveBefore;
 use crate::revlog::RevlogReviewKind;
 use crate::search::SortMode;
 
@@ -27,7 +28,7 @@ impl Collection {
         if req.days_to_simulate == 0 {
             invalid_input!("no days to simulate")
         }
-        let p = self.get_optimal_retention_parameters(&req.search)?;
+        let p = self.get_optimal_retention_parameters(&req.search, req.ignore_before)?;
         Ok(fsrs
             .optimal_retention(
                 &SimulatorConfig {
@@ -69,12 +70,14 @@ impl Collection {
     pub fn get_optimal_retention_parameters(
         &mut self,
         search: &str,
+        ignore_before: i64,
     ) -> Result<OptimalRetentionParameters> {
         let revlogs = self
             .search_cards_into_table(search, SortMode::NoOrder)?
             .col
             .storage
-            .get_revlog_entries_for_searched_cards_in_card_order()?;
+            .get_revlog_entries_for_searched_cards_in_card_order()?
+            .remove_before(ignore_before);
 
         let first_rating_count = revlogs
             .iter()

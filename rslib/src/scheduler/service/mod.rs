@@ -281,7 +281,7 @@ impl crate::services::SchedulerService for Collection {
         &mut self,
         input: scheduler::GetOptimalRetentionParametersRequest,
     ) -> Result<scheduler::GetOptimalRetentionParametersResponse> {
-        self.get_optimal_retention_parameters(&input.search)
+        self.get_optimal_retention_parameters(&input.search, input.ignore_before)
             .map(|params| GetOptimalRetentionParametersResponse {
                 params: Some(params),
             })
