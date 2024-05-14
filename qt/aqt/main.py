@@ -499,6 +499,7 @@ class AnkiQt(QMainWindow):
         def _onsuccess(synced: bool) -> None:
             if synced:
                 self._refresh_after_sync()
+                self.maybe_periodic_optimize_fsrs()
             if onsuccess:
                 onsuccess()
             if not self.safeMode:
@@ -725,6 +726,19 @@ class AnkiQt(QMainWindow):
         self.pm.profile["lastOptimize"] = int_time()
         self.pm.save()
         self.progress.finish()
+
+    def maybe_periodic_optimize_fsrs(self):
+        if self.col.get_config('fsrs'):
+            optimize_period_days = 30
+            last_optimize = self.col.get_config('last_periodic_fsrs_optimize') or 0
+            if True or (int_time() - last_optimize) > 86400 * optimize_period_days:
+                to_optimize = [conf for conf in self.col.decks.all_config() if conf.get("periodic_fsrs_optimize")]
+                to_optimize_names = "\n".join([conf["name"] for conf in to_optimize])
+
+                askUser(f"The following decks are scheduled to be optimized\n\n{to_optimize_names}\n\nOptimize now?", defaultno=True)
+                
+                # self.backend.compute_fsrs_weights()
+                return
 
     # Tracking main window state (deck browser, reviewer, etc)
     ##########################################################################
