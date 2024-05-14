@@ -9,6 +9,7 @@ import os
 import re
 import signal
 import weakref
+from datetime import datetime
 from argparse import Namespace
 from concurrent.futures import Future
 from typing import Any, Literal, Sequence, TypeVar, cast
@@ -730,15 +731,25 @@ class AnkiQt(QMainWindow):
     def maybe_periodic_optimize_fsrs(self):
         if self.col.get_config('fsrs'):
             optimize_period_days = 30
-            last_optimize = self.col.get_config('last_periodic_fsrs_optimize') or 0
+            last_optimize = self.col.get_config('lastPeriodicFsrsOptimize') or 0
             if True or (int_time() - last_optimize) > 86400 * optimize_period_days:
                 to_optimize = [conf for conf in self.col.decks.all_config() if conf.get("periodicOptimize")]
                 to_optimize_names = "\n".join([conf["name"] for conf in to_optimize])
 
-                askUser(f"The following decks are scheduled to be optimized\n\n{to_optimize_names}\n\nOptimize now?", defaultno=True)
-                
-                # self.backend.compute_fsrs_weights()
-                return
+                # todo i18n
+                if not askUser(f"The following decks are scheduled to be optimized\n\n{to_optimize_names}\n\nOptimize now?", defaultno=True):
+                    return
+
+                for conf in to_optimize:
+                    print(f"{conf['ignoreRevlogsBeforeDate']=}")
+                    ignore_revlogs_before_ms = int(datetime.strptime(conf["ignoreRevlogsBeforeDate"], "%Y-%m-%d").timestamp() * 1000)
+                    print(f"{ignore_revlogs_before_ms=}")
+                    print(conf["fsrsWeights"])
+                    new_weights = self.backend.compute_fsrs_weights(search=f"preset:{conf['name']} -is:suspended", current_weights=conf["fsrsWeights"], ignore_revlogs_before_ms=ignore_revlogs_before_ms)
+                    new_weights = list(new_weights.weights)
+                    print(f"Config {conf['name']} fsrs weights changed from {conf['fsrsWeights']} to {new_weights}")
+                    conf["fsrsWeights"] = new_weights
+                    self.col.decks.update_config(conf)
 
     # Tracking main window state (deck browser, reviewer, etc)
     ##########################################################################
