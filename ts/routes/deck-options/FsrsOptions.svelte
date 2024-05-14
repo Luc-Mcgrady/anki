@@ -337,6 +337,14 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 </div>
 
 <div class="m-2">
+    <SwitchRow bind:value={$config.periodicOptimize} defaultValue={false}>
+        <SettingTitle on:click={() => openHelpModal("periodicOptimize")}>
+            {"Periodic optimize"} <!-- todo i18n -->
+        </SettingTitle>
+    </SwitchRow>
+</div>
+
+<div class="m-2">
     <details>
         <summary>{tr.deckConfigComputeOptimalRetention()} (experimental)</summary>
 

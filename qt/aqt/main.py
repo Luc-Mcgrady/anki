@@ -732,7 +732,7 @@ class AnkiQt(QMainWindow):
             optimize_period_days = 30
             last_optimize = self.col.get_config('last_periodic_fsrs_optimize') or 0
             if True or (int_time() - last_optimize) > 86400 * optimize_period_days:
-                to_optimize = [conf for conf in self.col.decks.all_config() if conf.get("periodic_fsrs_optimize")]
+                to_optimize = [conf for conf in self.col.decks.all_config() if conf.get("periodicOptimize")]
                 to_optimize_names = "\n".join([conf["name"] for conf in to_optimize])
 
                 askUser(f"The following decks are scheduled to be optimized\n\n{to_optimize_names}\n\nOptimize now?", defaultno=True)
