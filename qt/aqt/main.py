@@ -736,6 +736,9 @@ class AnkiQt(QMainWindow):
                 to_optimize = [conf for conf in self.col.decks.all_config() if conf.get("periodicOptimize")]
                 to_optimize_names = "\n".join([conf["name"] for conf in to_optimize])
 
+                if not to_optimize:
+                    return
+
                 # todo i18n
                 if not askUser(f"The following decks are scheduled to be optimized\n\n{to_optimize_names}\n\nOptimize now?", defaultno=True):
                     return
