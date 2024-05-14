@@ -500,11 +500,11 @@ class AnkiQt(QMainWindow):
         def _onsuccess(synced: bool) -> None:
             if synced:
                 self._refresh_after_sync()
-                self.maybe_periodic_optimize_fsrs()
             if onsuccess:
                 onsuccess()
             if not self.safeMode:
                 self.maybe_check_for_addon_updates(self.setup_auto_update)
+            self.maybe_periodic_optimize_fsrs()
 
         last_day_cutoff = self.col.sched.day_cutoff
 
