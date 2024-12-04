@@ -60,6 +60,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
                                         value={1.0}
                                         checked={$config.easyDaysPercentages[index] ===
                                             1.0}
+                                        style:height="2em"
                                     />
                                 </td>
                                 <td>
@@ -69,6 +70,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
                                         value={0.5}
                                         checked={$config.easyDaysPercentages[index] ===
                                             0.5}
+                                        style:height="1.5em"
                                     />
                                 </td>
                                 <td>
@@ -78,6 +80,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
                                         value={0.0}
                                         checked={$config.easyDaysPercentages[index] ===
                                             0.0}
+                                        style:height="1em"
                                     />
                                 </td>
                             </tr>
@@ -102,5 +105,10 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         padding: 8px;
         text-align: center;
         border: 1px solid #ddd;
+    }
+    input[type=radio] {
+        border: 0px;
+        width: 100%;
+        height: 2em;
     }
 </style>
