@@ -1,10 +1,13 @@
 // Copyright: Ankitects Pty Ltd and contributors
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
+use std::i64;
+
 use anki_proto::stats::graphs_response::buttons::ButtonCounts;
 use anki_proto::stats::graphs_response::Buttons;
 
 use super::GraphsContext;
+use super::TimestampSecs;
 use crate::revlog::RevlogEntry;
 use crate::revlog::RevlogReviewKind;
 
@@ -17,15 +20,33 @@ impl GraphsContext {
         };
         let mut conditional_buckets = vec![
             (
+                None,
                 self.next_day_start.adding_secs(-86_400 * 365),
                 all_time.clone(),
             ),
             (
+                None,
                 self.next_day_start.adding_secs(-86_400 * 90),
                 all_time.clone(),
             ),
             (
+                None,
                 self.next_day_start.adding_secs(-86_400 * 30),
+                all_time.clone(),
+            ),
+            (
+                None,
+                self.next_day_start.adding_secs(-86_400 * 7),
+                all_time.clone(),
+            ),
+            (
+                Some(self.next_day_start.adding_secs(-86_400 * 1)),
+                self.next_day_start.adding_secs(-86_400 * 2),
+                all_time.clone(),
+            ),
+            (
+                None,
+                self.next_day_start.adding_secs(-86_400 * 1),
                 all_time.clone(),
             ),
         ];
@@ -38,17 +59,23 @@ impl GraphsContext {
             };
             let review_secs = review.id.as_secs();
             increment_button_counts(&mut all_time, interval_bucket, button_idx);
-            for (stamp, bucket) in &mut conditional_buckets {
-                if &review_secs < stamp {
+            for (minstamp, maxstamp, bucket) in &mut conditional_buckets {
+                if &review_secs < maxstamp {
                     continue 'outer;
                 }
-                increment_button_counts(bucket, interval_bucket, button_idx);
+                let minstamp = minstamp.unwrap_or(TimestampSecs::from(i64::MAX));
+                if review_secs < minstamp {
+                    increment_button_counts(bucket, interval_bucket, button_idx);
+                }
             }
         }
         Buttons {
-            one_month: Some(conditional_buckets.pop().unwrap().1),
-            three_months: Some(conditional_buckets.pop().unwrap().1),
-            one_year: Some(conditional_buckets.pop().unwrap().1),
+            today: Some(conditional_buckets.pop().unwrap().2),
+            yesterday: Some(conditional_buckets.pop().unwrap().2),
+            one_week: Some(conditional_buckets.pop().unwrap().2),
+            one_month: Some(conditional_buckets.pop().unwrap().2),
+            three_months: Some(conditional_buckets.pop().unwrap().2),
+            one_year: Some(conditional_buckets.pop().unwrap().2),
             all_time: Some(all_time),
         }
     }

@@ -34,16 +34,22 @@ export interface GraphData {
     mature: ButtonCounts;
 }
 
-export function gatherData(data: GraphsResponse, range: GraphRange): GraphData {
+export function gatherData(data: GraphsResponse, range: ButtonGraphRange): GraphData {
     const buttons = data.buttons!;
     switch (range) {
-        case GraphRange.Month:
+        case ButtonGraphRange.Today:
+            return buttons.today!;
+        case ButtonGraphRange.Yesterday:
+            return buttons.yesterday!;
+        case ButtonGraphRange.Week:
+            return buttons.oneWeek!;
+        case ButtonGraphRange.Month:
             return buttons.oneMonth!;
-        case GraphRange.ThreeMonths:
+        case ButtonGraphRange.ThreeMonths:
             return buttons.threeMonths!;
-        case GraphRange.Year:
+        case ButtonGraphRange.Year:
             return buttons.oneYear!;
-        case GraphRange.AllTime:
+        case ButtonGraphRange.AllTime:
             return buttons.allTime!;
     }
 }
@@ -62,11 +68,21 @@ interface TotalCorrect {
     percent: string;
 }
 
+export enum ButtonGraphRange {
+    Today = -3,
+    Yesterday = -2,
+    Week = -1,
+    Month = GraphRange.Month,
+    ThreeMonths = GraphRange.ThreeMonths,
+    Year = GraphRange.Year,
+    AllTime = GraphRange.AllTime,
+}
+
 export function renderButtons(
     svgElem: SVGElement,
     bounds: GraphBounds,
     origData: GraphsResponse,
-    range: GraphRange,
+    range: ButtonGraphRange,
 ): void {
     const sourceData = gatherData(origData, range);
     const data = [

@@ -7,7 +7,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     import * as tr from "@generated/ftl";
 
     import AxisTicks from "./AxisTicks.svelte";
-    import { renderButtons } from "./buttons";
+    import { ButtonGraphRange, renderButtons } from "./buttons";
     import Graph from "./Graph.svelte";
     import type { RevlogRange } from "./graph-helpers";
     import { defaultGraphBounds, GraphRange } from "./graph-helpers";
@@ -19,14 +19,14 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     export let sourceData: GraphsResponse | null = null;
     export let revlogRange: RevlogRange;
 
-    let graphRange: GraphRange = GraphRange.Year;
+    let graphRange: ButtonGraphRange | GraphRange = GraphRange.Year;
 
     const bounds = defaultGraphBounds();
 
     let svg = null as HTMLElement | SVGElement | null;
 
     $: if (sourceData) {
-        renderButtons(svg as SVGElement, bounds, sourceData, graphRange);
+        renderButtons(svg as SVGElement, bounds, sourceData, graphRange as ButtonGraphRange);
     }
 
     const title = tr.statisticsAnswerButtonsTitle();
@@ -35,7 +35,19 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 <Graph {title} {subtitle}>
     <InputBox>
-        <GraphRangeRadios bind:graphRange {revlogRange} followRevlog={true} />
+        <label>
+            <input type="radio" bind:group={graphRange} value={ButtonGraphRange.Today} />
+            {tr.statisticsTrueRetentionToday()}
+        </label>
+        <label>
+            <input type="radio" bind:group={graphRange} value={ButtonGraphRange.Yesterday} />
+            {tr.statisticsTrueRetentionYesterday()}
+        </label>
+        <label>
+            <input type="radio" bind:group={graphRange} value={ButtonGraphRange.Week} />
+            {tr.statisticsTrueRetentionWeek()}
+        </label>
+        <GraphRangeRadios bind:graphRange={graphRange as GraphRange} {revlogRange} followRevlog={true} />
     </InputBox>
 
     <svg bind:this={svg} viewBox={`0 0 ${bounds.width} ${bounds.height}`}>

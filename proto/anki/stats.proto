@@ -133,7 +133,10 @@ message GraphsResponse {
       repeated uint32 learning = 1;
       repeated uint32 young = 2;
       repeated uint32 mature = 3;
-    }
+    };
+    ButtonCounts today = 5;
+    ButtonCounts yesterday = 6;
+    ButtonCounts one_week = 7;
     ButtonCounts one_month = 1;
     ButtonCounts three_months = 2;
     ButtonCounts one_year = 3;
