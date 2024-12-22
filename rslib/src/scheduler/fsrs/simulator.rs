@@ -1,6 +1,9 @@
 // Copyright: Ankitects Pty Ltd and contributors
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
+use std::time::SystemTime;
+use std::time::UNIX_EPOCH;
+
 use anki_proto::scheduler::SimulateFsrsReviewRequest;
 use anki_proto::scheduler::SimulateFsrsReviewResponse;
 use fsrs::simulate;
@@ -56,7 +59,7 @@ impl Collection {
             &config,
             &req.params,
             req.desired_retention,
-            None,
+            Some(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis().try_into().unwrap()),
             Some(converted_cards),
         )?;
         Ok(SimulateFsrsReviewResponse {
