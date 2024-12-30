@@ -88,6 +88,8 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         optimalRetentionRequest.daysToSimulate = 3650;
     }
 
+    $: newCardsIgnoreReviewLimit = state.newCardsIgnoreReviewLimit
+
     const simulateFsrsRequest = new SimulateFsrsReviewRequest({
         params: fsrsParams($config),
         desiredRetention: $config.desiredRetention,
@@ -318,6 +320,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
                     simulateFsrsRequest.params = fsrsParams($config);
                     simulateFsrsRequest.desiredRetention = $config.desiredRetention;
                     simulateFsrsRequest.search = `preset:"${state.getCurrentNameForSearch()}" -is:suspended`;
+                    simulateFsrsRequest.newCardsIgnoreReviewLimit = $newCardsIgnoreReviewLimit
                     simulateProgressString = "processing...";
                     resp = await simulateFsrsReview(simulateFsrsRequest);
                 },

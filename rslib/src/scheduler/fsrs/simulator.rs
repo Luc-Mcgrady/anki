@@ -46,6 +46,7 @@ impl Collection {
             loss_aversion: 1.0,
             learn_limit: req.new_limit as usize,
             review_limit: req.review_limit as usize,
+            new_cards_ignore_review_limit: req.new_cards_ignore_review_limit
         };
         let (
             accumulated_knowledge_acquisition,
