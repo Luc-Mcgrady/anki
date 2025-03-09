@@ -160,16 +160,24 @@ impl Collection {
         let post_scheduling_fn: Option<PostSchedulingFn> =
             if self.get_config_bool(BoolKey::LoadBalancerEnabled) {
                 Some(PostSchedulingFn(Arc::new(
-                    move |interval, max_interval, today, due_cnt_per_day, rng| {
-                        apply_load_balance_and_easy_days(
-                            interval,
+                    move |card, max_interval, today, due_cnt_per_day, rng| {
+                        let ivl = apply_load_balance_and_easy_days(
+                            card.interval,
                             max_interval,
                             today,
                             due_cnt_per_day,
                             rng,
                             next_day_at,
                             &easy_days_percentages,
-                        )
+                        );
+                        if card.last_date + ivl > req.days_to_simulate as f32 {
+                            fsrs::next_interval(card.stability, 0.9_f32.max(req.desired_retention))
+                                .round()
+                                .clamp(1.0, req.days_to_simulate as f32)
+                        }
+                        else {
+                            ivl
+                        }
                     },
                 )))
             } else {
