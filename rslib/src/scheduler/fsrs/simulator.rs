@@ -1,6 +1,9 @@
 // Copyright: Ankitects Pty Ltd and contributors
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::Mutex;
+use std::u32;
 
 use anki_proto::deck_config::deck_config::config::ReviewCardOrder;
 use anki_proto::deck_config::deck_config::config::ReviewCardOrder::*;
@@ -142,6 +145,7 @@ impl Collection {
             .min(req.new_limit as usize);
         if req.new_limit > 0 {
             let new_cards = (0..new_cards).map(|i| fsrs::Card {
+                id: -(i as i32),
                 difficulty: f32::NEG_INFINITY,
                 stability: 1e-8,              // Not filtered by fsrs-rs
                 last_date: f32::NEG_INFINITY, // Treated as a new card in simulation
@@ -157,19 +161,30 @@ impl Collection {
         let easy_days_percentages = parse_easy_days_percentages(req.easy_days_percentages)?;
         let next_day_at = self.timing_today()?.next_day_at;
 
+        let mut reps = Arc::new(Mutex::new(HashMap::new()));
+
         let post_scheduling_fn: Option<PostSchedulingFn> =
             if self.get_config_bool(BoolKey::LoadBalancerEnabled) {
                 Some(PostSchedulingFn(Arc::new(
-                    move |interval, max_interval, today, due_cnt_per_day, rng| {
-                        apply_load_balance_and_easy_days(
-                            interval,
-                            max_interval,
-                            today,
-                            due_cnt_per_day,
-                            rng,
-                            next_day_at,
-                            &easy_days_percentages,
-                        )
+                    move |card, max_interval, today, due_cnt_per_day, rng| {
+                        let mut reps = reps.lock().unwrap();
+                        let rep_count = reps.entry(card.id).or_insert(0);
+                        *rep_count += 1;
+
+                        if *rep_count < req.suspend_after_lapse_count.unwrap_or(u32::MAX) {
+                            apply_load_balance_and_easy_days(
+                                card.interval,
+                                max_interval,
+                                today,
+                                due_cnt_per_day,
+                                rng,
+                                next_day_at,
+                                &easy_days_percentages,
+                            )
+                        }
+                        else {
+                            f32::INFINITY
+                        }
                     },
                 )))
             } else {
@@ -199,7 +214,7 @@ impl Collection {
             learn_limit: req.new_limit as usize,
             review_limit: req.review_limit as usize,
             new_cards_ignore_review_limit: req.new_cards_ignore_review_limit,
-            suspend_after_lapses: req.suspend_after_lapse_count,
+            suspend_after_lapses: None,
             post_scheduling_fn,
             review_priority_fn,
         };
@@ -236,6 +251,7 @@ impl Card {
                     let relative_due = due - days_elapsed;
                     let last_date = (relative_due - card.interval as i32).min(0) as f32;
                     Some(fsrs::Card {
+                        id: card.id.0 as i32,
                         difficulty: state.difficulty,
                         stability: state.stability,
                         last_date,
@@ -247,6 +263,7 @@ impl Card {
                 CardQueue::New => None,
                 CardQueue::Learn | CardQueue::SchedBuried | CardQueue::UserBuried => {
                     Some(fsrs::Card {
+                        id: card.id.0 as i32,
                         difficulty: state.difficulty,
                         stability: state.stability,
                         last_date: 0.0,
