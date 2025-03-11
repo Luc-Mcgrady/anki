@@ -10,6 +10,7 @@ use fsrs::simulate;
 use fsrs::PostSchedulingFn;
 use fsrs::ReviewPriorityFn;
 use fsrs::SimulatorConfig;
+use itertools::izip;
 use itertools::Itertools;
 use rand::rngs::StdRng;
 use rand::Rng;
@@ -160,9 +161,9 @@ impl Collection {
         let post_scheduling_fn: Option<PostSchedulingFn> =
             if self.get_config_bool(BoolKey::LoadBalancerEnabled) {
                 Some(PostSchedulingFn(Arc::new(
-                    move |interval, max_interval, today, due_cnt_per_day, rng| {
+                    move |card, max_interval, today, due_cnt_per_day, rng| {
                         apply_load_balance_and_easy_days(
-                            interval,
+                            card.interval,
                             max_interval,
                             today,
                             due_cnt_per_day,
@@ -212,11 +213,13 @@ impl Collection {
         )?;
         Ok(SimulateFsrsReviewResponse {
             accumulated_knowledge_acquisition: result.memorized_cnt_per_day,
-            daily_review_count: result
-                .review_cnt_per_day
-                .iter()
-                .map(|x| *x as u32)
-                .collect_vec(),
+            daily_review_count: izip![
+                &result.review_cnt_per_day,
+                &result.learn_cnt_per_day,
+                &result.correct_per_day
+            ]
+            .map(|(&rev, &lrn, &correct)| ((correct * 100) / ((rev + lrn))) as u32)
+            .collect_vec(),
             daily_new_count: result
                 .learn_cnt_per_day
                 .iter()
