@@ -32,6 +32,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     import ParamsSearchRow from "./ParamsSearchRow.svelte";
     import SimulatorModal from "./SimulatorModal.svelte";
     import { UpdateDeckConfigsMode } from "@generated/anki/deck_config_pb";
+    import DesiredRetentionModal from "./DesiredRetentionModal.svelte";
 
     export let state: DeckOptionsState;
     export let openHelpModal: (String) => void;
@@ -304,6 +305,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     }
 
     let showSimulator = false;
+    let showDesiredRetention = false;
 </script>
 
 <SpinBoxFloatRow
@@ -436,8 +438,23 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     </button>
 </div>
 
+<div class="m-2">
+    <button class="btn btn-primary" on:click={() => (showDesiredRetention = true)}>
+        {"Desired Retention Curve"}
+    </button>
+</div>
+
 <SimulatorModal
     bind:shown={showSimulator}
+    {state}
+    {simulateFsrsRequest}
+    {computing}
+    {openHelpModal}
+    {onPresetChange}
+/>
+
+<DesiredRetentionModal
+    bind:shown={showDesiredRetention}
     {state}
     {simulateFsrsRequest}
     {computing}
