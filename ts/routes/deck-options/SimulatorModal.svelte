@@ -47,7 +47,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
     let svg: HTMLElement | SVGElement | null = null;
     let simulationNumber = 0;
-    let points: Point[] = [];
+    export let points: Point[] = [];
     const newCardsIgnoreReviewLimit = state.newCardsIgnoreReviewLimit;
     let smooth = true;
     let suspendLeeches = $config.leechAction == DeckConfig_Config_LeechAction.SUSPEND;
@@ -75,19 +75,17 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         return arr1.map((value, index) => value + arr2[index]);
     }
 
-    async function simulateFsrs(): Promise<void> {
+    export let simulateFsrs = async (
+        req: SimulateFsrsReviewRequest,
+        svg: HTMLElement | SVGElement | null,
+        simulateSubgraph: SimulateSubgraph,
+    ) => {
         let resp: SimulateFsrsReviewResponse | undefined;
-        simulateFsrsRequest.daysToSimulate = daysToSimulate;
-        simulateFsrsRequest.deckSize = deckSize;
-        simulateFsrsRequest.suspendAfterLapseCount = suspendLeeches
-            ? leechThreshold
-            : undefined;
-        simulateFsrsRequest.easyDaysPercentages = easyDayPercentages;
         try {
             await runWithBackendProgress(
                 async () => {
                     simulating = true;
-                    resp = await simulateFsrsReview(simulateFsrsRequest);
+                    resp = await simulateFsrsReview(req);
                 },
                 () => {},
             );
@@ -120,6 +118,16 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
                 );
             }
         }
+    };
+
+    async function _simulateFsrs(): Promise<void> {
+        simulateFsrsRequest.daysToSimulate = daysToSimulate;
+        simulateFsrsRequest.deckSize = deckSize;
+        simulateFsrsRequest.suspendAfterLapseCount = suspendLeeches
+            ? leechThreshold
+            : undefined;
+        simulateFsrsRequest.easyDaysPercentages = easyDayPercentages;
+        await simulateFsrs(simulateFsrsRequest, svg, simulateSubgraph);
     }
 
     function clearSimulation() {
@@ -331,7 +339,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
                 <button
                     class="btn {computing ? 'btn-warning' : 'btn-primary'}"
                     disabled={computing}
-                    on:click={simulateFsrs}
+                    on:click={_simulateFsrs}
                 >
                     {tr.deckConfigSimulate()}
                 </button>

@@ -10,12 +10,14 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     import {
         ComputeOptimalRetentionRequest,
         SimulateFsrsReviewRequest,
+        SimulateFsrsReviewResponse,
     } from "@generated/anki/scheduler_pb";
     import {
         computeFsrsParams,
         computeOptimalRetention,
         evaluateParams,
         setWantsAbort,
+        simulateFsrsReview,
     } from "@generated/backend";
     import * as tr from "@generated/ftl";
     import { runWithBackendProgress } from "@tslib/progress";
@@ -32,6 +34,10 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     import ParamsSearchRow from "./ParamsSearchRow.svelte";
     import SimulatorModal from "./SimulatorModal.svelte";
     import { UpdateDeckConfigsMode } from "@generated/anki/deck_config_pb";
+    import * as _ from "lodash-es";
+    import { renderSimulationChart, type Point, type SimulateSubgraph } from "../graphs/simulator";
+    import type { Writable } from "svelte/store";
+    import { defaultGraphBounds } from "../graphs/graph-helpers";
 
     export let state: DeckOptionsState;
     export let openHelpModal: (String) => void;
@@ -304,6 +310,65 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     }
 
     let showSimulator = false;
+    let showDesiredRetention = false;
+
+    let points: Point[] = [];
+    let simulationNumber = 0;
+
+    async function plotDesiredRetentionCosts(
+        req: SimulateFsrsReviewRequest,
+        svg: SVGElement | HTMLElement | null,
+        simulateSubgraph: SimulateSubgraph,
+    ): Promise<void> {
+        const begin = 0.7;
+        const end = 1;
+        let results: { i: number; resp: SimulateFsrsReviewResponse }[] = [];
+        let failed = true;
+        try {
+            const retentions = _.range(begin, end, 0.01);
+            await retentions.entries()) {
+                await runWithBackendProgress(
+                    async () => {
+                        computing = true;
+                        req.desiredRetention = desiredRetention;
+                        // progress = i
+                        results.push({
+                            i: desiredRetention,
+                            resp: await simulateFsrsReview(req),
+                        });
+                    },
+                    () => {},
+                );
+            }
+            failed = false;
+        } finally {
+            computing = false;
+            if (!failed) {
+                simulationNumber += 1;
+
+                points = points.concat(
+                    results.map(({ resp: v, i }) => ({
+                        x: (i - begin) * 100,
+                        timeCost: _.sum(v.dailyTimeCost),
+                        count: 0, // dailyTotalCount[i],
+                        memorized:
+                            _.sum(v.dailyTimeCost) /
+                            v.accumulatedKnowledgeAcquisition[
+                                v.accumulatedKnowledgeAcquisition.length - 1
+                            ], // dailyMemorizedCount[i],
+                        label: simulationNumber,
+                    })),
+                );
+
+                renderSimulationChart(
+                    svg as SVGElement,
+                    defaultGraphBounds(),
+                    points,
+                    simulateSubgraph,
+                );
+            }
+        }
+    }
 </script>
 
 <SpinBoxFloatRow
@@ -436,6 +501,12 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     </button>
 </div>
 
+<div class="m-2">
+    <button class="btn btn-primary" on:click={() => (showDesiredRetention = true)}>
+        {"Desired Retention Curve"}
+    </button>
+</div>
+
 <SimulatorModal
     bind:shown={showSimulator}
     {state}
@@ -443,6 +514,17 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     {computing}
     {openHelpModal}
     {onPresetChange}
+/>
+
+<SimulatorModal
+    bind:shown={showDesiredRetention}
+    bind:points
+    {state}
+    {simulateFsrsRequest}
+    {computing}
+    {openHelpModal}
+    {onPresetChange}
+    simulateFsrs={plotDesiredRetentionCosts}
 />
 
 <style>
