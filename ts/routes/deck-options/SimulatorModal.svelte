@@ -3,7 +3,6 @@ Copyright: Ankitects Pty Ltd and contributors
 License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 -->
 <script lang="ts">
-    import SpinBoxRow from "./SpinBoxRow.svelte";
     import SettingTitle from "$lib/components/SettingTitle.svelte";
     import Graph from "../graphs/Graph.svelte";
     import HoverColumns from "../graphs/HoverColumns.svelte";
@@ -23,13 +22,10 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         SimulateFsrsReviewResponse,
     } from "@generated/anki/scheduler_pb";
     import type { DeckOptionsState } from "./lib";
-    import SwitchRow from "$lib/components/SwitchRow.svelte";
-    import GlobalLabel from "./GlobalLabel.svelte";
-    import SpinBoxFloatRow from "./SpinBoxFloatRow.svelte";
-    import { reviewOrderChoices } from "./choices";
-    import EnumSelectorRow from "$lib/components/EnumSelectorRow.svelte";
     import { DeckConfig_Config_LeechAction } from "@generated/anki/deck_config_pb";
-    import EasyDaysInput from "./EasyDaysInput.svelte";
+    import SimulatorConfig from "./SimulatorConfig.svelte";
+    import ModalHeader from "./ModalHeader.svelte";
+    import SwitchRow from "$lib/components/SwitchRow.svelte";
 
     export let shown = false;
     export let state: DeckOptionsState;
@@ -42,13 +38,12 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     let simulateSubgraph: SimulateSubgraph = SimulateSubgraph.count;
     let tableData: TableDatum[] = [];
     let simulating: boolean = false;
-    const fsrs = state.fsrs;
     const bounds = defaultGraphBounds();
 
     let svg: HTMLElement | SVGElement | null = null;
     let simulationNumber = 0;
     let points: Point[] = [];
-    const newCardsIgnoreReviewLimit = state.newCardsIgnoreReviewLimit;
+    let newCardsIgnoreReviewLimit = state.newCardsIgnoreReviewLimit;
     let smooth = true;
     let suspendLeeches = $config.leechAction == DeckConfig_Config_LeechAction.SUSPEND;
     let leechThreshold = $config.leechThreshold;
@@ -82,7 +77,6 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         simulateFsrsRequest.suspendAfterLapseCount = suspendLeeches
             ? leechThreshold
             : undefined;
-        simulateFsrsRequest.easyDaysPercentages = easyDayPercentages;
         try {
             await runWithBackendProgress(
                 async () => {
@@ -177,157 +171,30 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
             simulateSubgraph,
         );
     }
-
-    let easyDayPercentages = [...$config.easyDaysPercentages];
 </script>
 
 <div class="modal" class:show={shown} class:d-block={shown} tabindex="-1">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">{tr.deckConfigFsrsSimulatorExperimental()}</h5>
-                <button
-                    type="button"
-                    class="btn-close"
-                    aria-label="Close"
-                    on:click={() => (shown = false)}
-                ></button>
-            </div>
+            <ModalHeader bind:shown>
+                {tr.deckConfigFsrsSimulatorExperimental()}
+            </ModalHeader>
             <div class="modal-body">
-                <SpinBoxRow
-                    bind:value={daysToSimulate}
-                    defaultValue={365}
-                    min={1}
-                    max={3650}
-                >
+                <SimulatorConfig
+                    bind:simulateFsrsRequest
+                    bind:suspendLeeches
+                    bind:leechThreshold
+                    bind:newCardsIgnoreReviewLimit
+                    bind:daysToSimulate
+                    bind:deckSize
+                    {openHelpModal}
+                    {state}
+                ></SimulatorConfig>
+                <SwitchRow bind:value={smooth} defaultValue={true}>
                     <SettingTitle on:click={() => openHelpModal("simulateFsrsReview")}>
-                        {tr.deckConfigDaysToSimulate()}
+                        {"Smooth Graph"}
                     </SettingTitle>
-                </SpinBoxRow>
-
-                <SpinBoxRow bind:value={deckSize} defaultValue={0} min={0} max={100000}>
-                    <SettingTitle on:click={() => openHelpModal("simulateFsrsReview")}>
-                        {tr.deckConfigAdditionalNewCardsToSimulate()}
-                    </SettingTitle>
-                </SpinBoxRow>
-
-                <SpinBoxFloatRow
-                    bind:value={simulateFsrsRequest.desiredRetention}
-                    defaultValue={$config.desiredRetention}
-                    min={0.7}
-                    max={0.99}
-                    percentage={true}
-                >
-                    <SettingTitle on:click={() => openHelpModal("desiredRetention")}>
-                        {tr.deckConfigDesiredRetention()}
-                    </SettingTitle>
-                </SpinBoxFloatRow>
-
-                <SpinBoxRow
-                    bind:value={simulateFsrsRequest.newLimit}
-                    defaultValue={$config.newPerDay}
-                    min={0}
-                    max={9999}
-                >
-                    <SettingTitle on:click={() => openHelpModal("simulateFsrsReview")}>
-                        {tr.schedulingNewCardsday()}
-                    </SettingTitle>
-                </SpinBoxRow>
-
-                <SpinBoxRow
-                    bind:value={simulateFsrsRequest.reviewLimit}
-                    defaultValue={$config.reviewsPerDay}
-                    min={0}
-                    max={9999}
-                >
-                    <SettingTitle on:click={() => openHelpModal("simulateFsrsReview")}>
-                        {tr.schedulingMaximumReviewsday()}
-                    </SettingTitle>
-                </SpinBoxRow>
-
-                <details>
-                    <summary>{tr.deckConfigEasyDaysTitle()}</summary>
-                    {#key easyDayPercentages}
-                        <EasyDaysInput bind:values={easyDayPercentages} />
-                    {/key}
-                </details>
-
-                <details>
-                    <summary>{"Advanced settings"}</summary>
-                    <SpinBoxRow
-                        bind:value={simulateFsrsRequest.maxInterval}
-                        defaultValue={$config.maximumReviewInterval}
-                        min={1}
-                        max={36500}
-                    >
-                        <SettingTitle
-                            on:click={() => openHelpModal("simulateFsrsReview")}
-                        >
-                            {tr.schedulingMaximumInterval()}
-                        </SettingTitle>
-                    </SpinBoxRow>
-
-                    <EnumSelectorRow
-                        bind:value={simulateFsrsRequest.reviewOrder}
-                        defaultValue={$config.reviewOrder}
-                        choices={reviewOrderChoices($fsrs)}
-                    >
-                        <SettingTitle
-                            on:click={() => openHelpModal("simulateFsrsReview")}
-                        >
-                            {tr.deckConfigReviewSortOrder()}
-                        </SettingTitle>
-                    </EnumSelectorRow>
-
-                    <SwitchRow
-                        bind:value={simulateFsrsRequest.newCardsIgnoreReviewLimit}
-                        defaultValue={$newCardsIgnoreReviewLimit}
-                    >
-                        <SettingTitle
-                            on:click={() => openHelpModal("simulateFsrsReview")}
-                        >
-                            <GlobalLabel
-                                title={tr.deckConfigNewCardsIgnoreReviewLimit()}
-                            />
-                        </SettingTitle>
-                    </SwitchRow>
-
-                    <SwitchRow bind:value={smooth} defaultValue={true}>
-                        <SettingTitle
-                            on:click={() => openHelpModal("simulateFsrsReview")}
-                        >
-                            {"Smooth Graph"}
-                        </SettingTitle>
-                    </SwitchRow>
-
-                    <SwitchRow
-                        bind:value={suspendLeeches}
-                        defaultValue={$config.leechAction ==
-                            DeckConfig_Config_LeechAction.SUSPEND}
-                    >
-                        <SettingTitle
-                            on:click={() => openHelpModal("simulateFsrsReview")}
-                        >
-                            {"Suspend Leeches"}
-                        </SettingTitle>
-                    </SwitchRow>
-
-                    {#if suspendLeeches}
-                        <SpinBoxRow
-                            bind:value={leechThreshold}
-                            defaultValue={$config.leechThreshold}
-                            min={1}
-                            max={9999}
-                        >
-                            <SettingTitle
-                                on:click={() => openHelpModal("simulateFsrsReview")}
-                            >
-                                {tr.schedulingLeechThreshold()}
-                            </SettingTitle>
-                        </SpinBoxRow>
-                    {/if}
-                </details>
-
+                </SwitchRow>
                 <button
                     class="btn {computing ? 'btn-warning' : 'btn-primary'}"
                     disabled={computing}
@@ -359,7 +226,9 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
                             ? DeckConfig_Config_LeechAction.SUSPEND
                             : DeckConfig_Config_LeechAction.TAG_ONLY;
                         $config.leechThreshold = leechThreshold;
-                        $config.easyDaysPercentages = [...easyDayPercentages];
+                        $config.easyDaysPercentages = [
+                            ...simulateFsrsRequest.easyDaysPercentages,
+                        ];
                         onPresetChange();
                     }}
                 >
@@ -439,13 +308,6 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         height: 100%;
     }
 
-    .modal-header {
-        position: sticky;
-        top: 0;
-        background-color: var(--bs-body-bg);
-        z-index: 100;
-    }
-
     :global(.modal-xl) {
         max-width: 100vw;
     }
@@ -456,9 +318,5 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
     .btn {
         margin-bottom: 0.375rem;
-    }
-
-    summary {
-        margin-bottom: 0.5em;
     }
 </style>
