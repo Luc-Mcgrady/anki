@@ -152,7 +152,7 @@ impl Collection {
         let deck_size = converted_cards.len();
         let p = self.get_optimal_retention_parameters(revlogs)?;
 
-        let easy_days_percentages = parse_easy_days_percentages(req.easy_days_percentages.clone())?;
+        let easy_days_percentages = parse_easy_days_percentages(&req.easy_days_percentages)?;
         let next_day_at = self.timing_today()?.next_day_at;
 
         let post_scheduling_fn: Option<PostSchedulingFn> =
