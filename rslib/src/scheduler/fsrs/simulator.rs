@@ -114,7 +114,10 @@ fn create_review_priority_fn(
 }
 
 impl Collection {
-    pub fn simulate_req_to_config(&mut self, req: &SimulateFsrsReviewRequest) -> Result<(SimulatorConfig, Vec<fsrs::Card>)> {
+    pub fn simulate_req_to_config(
+        &mut self,
+        req: &SimulateFsrsReviewRequest,
+    ) -> Result<(SimulatorConfig, Vec<fsrs::Card>)> {
         let guard = self.search_cards_into_table(&req.search, SortMode::NoOrder)?;
         let revlogs = guard
             .col
