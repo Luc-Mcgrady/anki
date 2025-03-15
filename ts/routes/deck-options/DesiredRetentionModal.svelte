@@ -74,7 +74,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     let progress = 0
 
     async function simulateFsrs(): Promise<void> {
-        let resp: SimulateFsrsReviewResponse | undefined;
+        let failed = true
         simulateFsrsRequest.daysToSimulate = daysToSimulate;
         simulateFsrsRequest.deckSize = deckSize;
         simulateFsrsRequest.suspendAfterLapseCount = suspendLeeches
@@ -83,7 +83,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         const begin = 0.7
         const end = 0.99
         const steps = 20
-        let results: SimulateFsrsReviewResponse[] = []
+        let results: {i: number, resp: SimulateFsrsReviewResponse}[] = []
         try {
             const retentions = _.range(begin, end, (end - begin) / steps)
             for (const [i, desiredRetention] of retentions.entries()) {
@@ -92,28 +92,23 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
                         simulating = true;
                         simulateFsrsRequest.desiredRetention = desiredRetention
                         progress = i
-                        results[desiredRetention] = await simulateFsrsReview(simulateFsrsRequest);
+                        results.push({i: desiredRetention, resp: await simulateFsrsReview(simulateFsrsRequest)});
                     },
                     () => {},
                 );
             }
+            failed = false
         } finally {
             simulating = false;
-            if (resp) {
+            if (!failed) {
                 simulationNumber += 1;
-                const dailyTotalCount = addArrays(
-                    resp.dailyReviewCount,
-                    resp.dailyNewCount,
-                );
-
-                const dailyMemorizedCount = resp.accumulatedKnowledgeAcquisition;
 
                 points = points.concat(
-                    resp.dailyTimeCost.map((v, i) => ({
+                    results.map(({resp: v, i}) => ({
                         x: i,
-                        timeCost: v,
-                        count: dailyTotalCount[i],
-                        memorized: dailyMemorizedCount[i],
+                        timeCost: _.sum(v.dailyTimeCost),
+                        count: 0, // dailyTotalCount[i],
+                        memorized: _.sum(v.dailyTimeCost) / v.accumulatedKnowledgeAcquisition[v.accumulatedKnowledgeAcquisition.length - 1], // dailyMemorizedCount[i],
                         label: simulationNumber,
                     })),
                 );
