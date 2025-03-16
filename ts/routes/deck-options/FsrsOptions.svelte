@@ -10,7 +10,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     import {
         ComputeOptimalRetentionRequest,
         SimulateFsrsReviewRequest,
-        SimulateFsrsReviewResponse,
+        type SimulateFsrsReviewResponse,
     } from "@generated/anki/scheduler_pb";
     import {
         computeFsrsParams,
@@ -35,8 +35,11 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     import SimulatorModal from "./SimulatorModal.svelte";
     import { UpdateDeckConfigsMode } from "@generated/anki/deck_config_pb";
     import * as _ from "lodash-es";
-    import { renderSimulationChart, type Point, type SimulateSubgraph } from "../graphs/simulator";
-    import type { Writable } from "svelte/store";
+    import {
+        renderSimulationChart,
+        type Point,
+        type SimulateSubgraph,
+    } from "../graphs/simulator";
     import { defaultGraphBounds } from "../graphs/graph-helpers";
 
     export let state: DeckOptionsState;
@@ -326,20 +329,22 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         let failed = true;
         try {
             const retentions = _.range(begin, end, 0.01);
-            await retentions.entries()) {
-                await runWithBackendProgress(
-                    async () => {
-                        computing = true;
-                        req.desiredRetention = desiredRetention;
-                        // progress = i
-                        results.push({
-                            i: desiredRetention,
-                            resp: await simulateFsrsReview(req),
-                        });
-                    },
-                    () => {},
-                );
-            }
+            await Promise.all(
+                [...retentions.entries()].map(async ([i, desiredRetention]) => {
+                    await runWithBackendProgress(
+                        async () => {
+                            computing = true;
+                            req.desiredRetention = desiredRetention;
+                            // progress = i
+                            results.push({
+                                i: desiredRetention,
+                                resp: await simulateFsrsReview(req),
+                            });
+                        },
+                        () => {},
+                    );
+                }),
+            );
             failed = false;
         } finally {
             computing = false;
