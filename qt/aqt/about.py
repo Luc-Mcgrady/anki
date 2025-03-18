@@ -168,7 +168,7 @@ def show(mw: aqt.AnkiQt) -> QDialog:
             "Ádám Szegi",
             "赵金鹏",
             "黃文龍",
-            "David Bailey",
+            "Valerie Enfys",
             "Arman High",
             "Arthur Milchior",
             "Rai (Michael Pokorny)",
@@ -215,6 +215,9 @@ def show(mw: aqt.AnkiQt) -> QDialog:
             "Danika_Dakika",
             "Marcelo Vasconcelos",
             "Mumtaz Hajjo Alrifai",
+            "Luc Mcgrady",
+            "Brayan Oliveira",
+            "Market345",
         )
     )
 

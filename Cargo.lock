@@ -2099,7 +2099,6 @@ dependencies = [
 [[package]]
 name = "fsrs"
 version = "3.0.0"
-source = "git+https://github.com/Luc-Mcgrady/fsrs-optimizer-burn.git?branch=correct-per-day#80489319b299db0271aa3174e9284ddb96c12161"
 dependencies = [
  "burn",
  "itertools 0.12.1",
