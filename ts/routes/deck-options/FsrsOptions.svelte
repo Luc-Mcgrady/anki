@@ -329,22 +329,22 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         let failed = true;
         try {
             const retentions = _.range(begin, end, 0.01);
-            await Promise.all(
-                [...retentions.entries()].map(async ([i, desiredRetention]) => {
-                    await runWithBackendProgress(
-                        async () => {
-                            computing = true;
-                            req.desiredRetention = desiredRetention;
-                            // progress = i
-                            results.push({
-                                i: desiredRetention,
-                                resp: await simulateFsrsReview(req),
-                            });
-                        },
-                        () => {},
-                    );
-                }),
-            );
+
+            for (const [i, desiredRetention] of retentions.entries()) {
+                await runWithBackendProgress(
+                    async () => {
+                        computing = true;
+                        req.desiredRetention = desiredRetention;
+                        // progress = i
+                        results.push({
+                            i: desiredRetention,
+                            resp: await simulateFsrsReview(req),
+                        });
+                    },
+                    () => {},
+                );
+            }
+
             failed = false;
         } finally {
             computing = false;
