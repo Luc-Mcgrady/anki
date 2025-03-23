@@ -317,6 +317,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
     let points: Point[] = [];
     let simulationNumber = 0;
+    let progress = ""
 
     async function plotDesiredRetentionCosts(
         req: SimulateFsrsReviewRequest,
@@ -330,12 +331,13 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         try {
             const retentions = _.range(begin, end, 0.01);
 
+            console.log(retentions.entries())
             for (const [i, desiredRetention] of retentions.entries()) {
                 await runWithBackendProgress(
                     async () => {
                         computing = true;
                         req.desiredRetention = desiredRetention;
-                        // progress = i
+                        progress = `${i}/${retentions.length}`
                         results.push({
                             i: desiredRetention,
                             resp: await simulateFsrsReview(req),
@@ -524,6 +526,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 <SimulatorModal
     bind:shown={showDesiredRetention}
     bind:points
+    bind:progress
     {state}
     {simulateFsrsRequest}
     {computing}
