@@ -267,13 +267,17 @@ class DeckBrowser:
         buf += """
 
         <td class=decktd colspan=5>%s%s<a class="deck %s"
-        href=# onclick="return pycmd('open:%d')">%s<span class=preset_name> (%s)</span></a></td>""" % (
+        href=# onclick="return pycmd('open:%d')">%s%s</a></td>""" % (
             indent(),
             collapse,
             extraclass,
             node.deck_id,
             html.escape(node.name),
-            html.escape(node.preset_name)
+            (
+                ""
+                if node.filtered
+                else f"<span class=preset_name> ({html.escape(node.preset_name)})</span>"
+            ),
         )
 
         # due counts
