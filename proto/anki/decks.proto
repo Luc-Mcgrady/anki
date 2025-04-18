@@ -154,6 +154,7 @@ message DeckTreeRequest {
 message DeckTreeNode {
   int64 deck_id = 1;
   string name = 2;
+  string preset_name = 15;
   uint32 level = 4;
   bool collapsed = 5;
 

@@ -99,6 +99,25 @@ fn add_counts(node: &mut DeckTreeNode, counts: &HashMap<DeckId, DueCounts>) {
     }
 }
 
+fn add_prefab_names(
+    node: &mut DeckTreeNode,
+    decks: &HashMap<DeckId, Deck>,
+    preset_map: &HashMap<DeckConfigId, DeckConfig>,
+) {
+    node.preset_name = decks
+        .get(&DeckId(node.deck_id))
+        .and_then(|deck| {
+            preset_map
+                .get(&deck.config_id().unwrap_or_default())
+                .map(|prefab| &prefab.name)
+        })
+        .unwrap_or(&"".to_string())
+        .to_owned();
+    for child in &mut node.children {
+        add_prefab_names(child, decks, preset_map);
+    }
+}
+
 /// A temporary container used during count summation and limit application.
 #[derive(Default, Clone)]
 struct NodeCountsV3 {
@@ -277,6 +296,7 @@ impl Collection {
             let counts = self.due_counts(days_elapsed, learn_cutoff)?;
             let dconf = self.storage.get_deck_config_map()?;
             add_counts(&mut tree, &counts);
+            add_prefab_names(&mut tree, &decks_map, &dconf);
             let limits = remaining_limits_map(
                 decks_map.values(),
                 &dconf,
