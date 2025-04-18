@@ -22,6 +22,18 @@ function init() {
         drop: handleDropEvent,
         hoverClass: "drag-hover",
     });
+
+    $(window).on("keydown", e => {
+        if (e.shiftKey) {
+            $("body").addClass("shifting");
+        }
+    });
+
+    $(window).on("keyup", e => {
+        if (e.shiftKey) {
+            $("body").removeClass("shifting");
+        }
+    });
 }
 
 function handleDropEvent(event, ui) {

@@ -267,7 +267,7 @@ class DeckBrowser:
         buf += """
 
         <td class=decktd colspan=5>%s%s<a class="deck %s"
-        href=# onclick="return pycmd('open:%d')">%s (%s)</a></td>""" % (
+        href=# onclick="return pycmd('open:%d')">%s<span class=preset_name> (%s)</span></a></td>""" % (
             indent(),
             collapse,
             extraclass,

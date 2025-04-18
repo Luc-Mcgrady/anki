@@ -152,6 +152,14 @@ tr:hover:not(.top-level-drag-row) {
     }
 }
 
+span.preset_name {
+    display: none;
+}
+
+.shifting span.preset_name {
+    display: inline;
+}
+
 #studiedToday {
     margin: 2em 0;
 }
