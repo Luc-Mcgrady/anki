@@ -276,7 +276,7 @@ class DeckBrowser:
             (
                 ""
                 if node.filtered
-                else f"<span class=preset_name> ({html.escape(node.preset_name)})</span>"
+                else f"""<span class="preset_name filtered"> ({html.escape(node.preset_name)})</span>"""
             ),
         )
 
