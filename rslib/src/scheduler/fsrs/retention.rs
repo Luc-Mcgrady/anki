@@ -21,9 +21,9 @@ impl Collection {
         if req.days_to_simulate == 0 {
             invalid_input!("no days to simulate")
         }
-        let (config, _) = self.simulate_request_to_config(&req)?;
+        let (config, cards) = self.simulate_request_to_config(&req)?;
         Ok(fsrs
-            .optimal_retention(&config, &req.params, |ip| {
+            .optimal_retention(&config, &req.params, Some(cards), |ip| {
                 anki_progress
                     .update(false, |p| {
                         p.current = ip.current as u32;
