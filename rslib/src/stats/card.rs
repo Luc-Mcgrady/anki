@@ -148,7 +148,11 @@ impl Collection {
             historical_retention,
             ignore_before,
         )? {
-            let memory_states = fsrs.historical_memory_states(item.item, item.starting_state)?;
+            let mut memory_states =
+                fsrs.historical_memory_states(item.item, item.starting_state)?;
+            if let Some(starting_state) = item.starting_state {
+                memory_states.insert(0, starting_state);
+            }
             let mut revlog_index = 0;
             for entry in revlog {
                 let mut stats_entry = stats_revlog_entry(&entry);
