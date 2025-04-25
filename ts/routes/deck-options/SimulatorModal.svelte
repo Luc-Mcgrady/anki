@@ -48,7 +48,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     let svg: HTMLElement | SVGElement | null = null;
     let simulationNumber = 0;
     export let points: Point[] = [];
-    export let progress = ""
+    export let progress = "";
     const newCardsIgnoreReviewLimit = state.newCardsIgnoreReviewLimit;
     let smooth = true;
     let suspendLeeches = $config.leechAction == DeckConfig_Config_LeechAction.SUSPEND;
