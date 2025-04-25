@@ -16,6 +16,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         description: string;
         collapsed: boolean;
         hidden: boolean;
+        isClozeField: boolean;
     }
 
     export interface EditorFieldAPI {
@@ -60,6 +61,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     export let collapsed = false;
     export let flipInputs = false;
     export let dupe = false;
+    export let index;
 
     const directionStore = writable<"ltr" | "rtl">();
     setContext(directionKey, directionStore);
@@ -81,6 +83,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         element,
         direction: directionStore,
         editingArea: editingArea as EditingAreaAPI,
+        isClozeField: field.isClozeField,
     });
 
     setContextProperty(api);
@@ -95,6 +98,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     on:mouseenter
     on:mouseleave
     role="presentation"
+    data-index={index}
 >
     <slot name="field-label" />
 

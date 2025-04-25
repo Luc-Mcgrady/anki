@@ -7,7 +7,9 @@ import enum
 import logging
 import mimetypes
 import os
+import random
 import re
+import string
 import sys
 import threading
 import traceback
@@ -139,14 +141,17 @@ class MediaServer(threading.Thread):
     ) -> None:
         self._legacy_pages[id] = LegacyPage(html, context)
 
+    def get_page(self, id: int) -> LegacyPage | None:
+        return self._legacy_pages.get(id)
+
     def get_page_html(self, id: int) -> str | None:
-        if page := self._legacy_pages.get(id):
+        if page := self.get_page(id):
             return page.html
         else:
             return None
 
     def get_page_context(self, id: int) -> PageContext | None:
-        if page := self._legacy_pages.get(id):
+        if page := self.get_page(id):
             return page.context
         else:
             return None
@@ -652,6 +657,8 @@ exposed_backend_list = [
     "evaluate_params",
     "get_optimal_retention_parameters",
     "simulate_fsrs_review",
+    # DeckConfigService
+    "get_ignored_before_count",
 ]
 
 
@@ -698,7 +705,6 @@ def _extract_collection_post_request(path: str) -> DynamicRequest | NotFound:
 def _check_dynamic_request_permissions():
     if request.method == "GET":
         return
-    context = _extract_page_context()
 
     def warn() -> None:
         show_warning(
@@ -710,24 +716,17 @@ def _check_dynamic_request_permissions():
         aqt.mw.taskman.run_on_main(warn)
         abort(403)
 
-    if context in [
-        PageContext.NON_LEGACY_PAGE,
-        PageContext.EDITOR,
-        PageContext.ADDON_PAGE,
-        PageContext.DECK_OPTIONS,
-    ]:
-        pass
-    elif context == PageContext.REVIEWER and request.path in (
+    # does page have access to entire API?
+    if _have_api_access():
+        return
+
+    # whitelisted API endpoints for reviewer/previewer
+    if request.path in (
         "/_anki/getSchedulingStatesWithContext",
         "/_anki/setSchedulingStates",
         "/_anki/i18nResources",
+        "/_anki/congratsInfo",
     ):
-        # reviewer is only allowed to access custom study methods
-        pass
-    elif (
-        context == PageContext.PREVIEWER or context == PageContext.CARD_LAYOUT
-    ) and request.path == "/_anki/i18nResources":
-        # previewers are only allowed to access i18n resources
         pass
     else:
         # other legacy pages may contain third-party JS, so we do not
@@ -746,29 +745,33 @@ def _handle_dynamic_request(req: DynamicRequest) -> Response:
 
 def legacy_page_data() -> Response:
     id = int(request.args["id"])
-    if html := aqt.mw.mediaServer.get_page_html(id):
-        return Response(html, mimetype="text/html")
+    page = aqt.mw.mediaServer.get_page(id)
+    if page:
+        response = Response(page.html, mimetype="text/html")
+        # Prevent JS in field content from being executed in the editor, as it would
+        # have access to our internal API, and is a security risk.
+        if page.context == PageContext.EDITOR:
+            port = aqt.mw.mediaServer.getPort()
+            csp_paths = (
+                f"http://127.0.0.1:{port}/_anki/",
+                f"http://127.0.0.1:{port}/_addons/",
+            )
+            response.headers["Content-Security-Policy"] = (
+                f"script-src {' '.join(csp_paths)}"
+            )
+        return response
     else:
         return _text_response(HTTPStatus.NOT_FOUND, "page not found")
 
 
-def _extract_page_context() -> PageContext:
-    "Get context based on referer header."
-    from urllib.parse import parse_qs, urlparse
+_APIKEY = "".join(random.choices(string.ascii_letters + string.digits, k=32))
 
-    referer = urlparse(request.headers.get("Referer", ""))
-    if referer.path.startswith("/_anki/pages/") or is_sveltekit_page(referer.path[1:]):
-        return PageContext.NON_LEGACY_PAGE
-    elif referer.path == "/_anki/legacyPageData":
-        query_params = parse_qs(referer.query)
-        query_id = query_params.get("id")
-        if not query_id:
-            return PageContext.UNKNOWN
-        id = int(query_id[0])
-        page_context = aqt.mw.mediaServer.get_page_context(id)
-        return page_context if page_context else PageContext.UNKNOWN
-    else:
-        return PageContext.UNKNOWN
+
+def _have_api_access() -> bool:
+    return (
+        request.headers.get("Authorization") == f"Bearer {_APIKEY}"
+        or os.environ.get("ANKI_API_HOST") == "0.0.0.0"
+    )
 
 
 # this currently only handles a single method; in the future, idempotent

@@ -7,6 +7,8 @@ use anki_proto::scheduler::ComputeMemoryStateResponse;
 use fsrs::FSRSItem;
 use fsrs::MemoryState;
 use fsrs::FSRS;
+use fsrs::FSRS5_DEFAULT_DECAY;
+use fsrs::FSRS6_DEFAULT_DECAY;
 use itertools::Itertools;
 
 use super::params::ignore_revlogs_before_ms_from_config;
@@ -76,6 +78,15 @@ impl Collection {
                 .then(|| Rescheduler::new(self))
                 .transpose()?;
             let fsrs = FSRS::new(req.as_ref().map(|w| &w.params[..]).or(Some([].as_slice())))?;
+            let decay = req.as_ref().map(|w| {
+                if w.params.is_empty() {
+                    FSRS6_DEFAULT_DECAY // default decay for FSRS-6
+                } else if w.params.len() < 21 {
+                    FSRS5_DEFAULT_DECAY // default decay for FSRS-4.5 and FSRS-5
+                } else {
+                    w.params[20]
+                }
+            });
             let historical_retention = req.as_ref().map(|w| w.historical_retention);
             let items = fsrs_items_for_memory_states(
                 &fsrs,
@@ -94,6 +105,7 @@ impl Collection {
                 if let (Some(req), Some(item)) = (&req, item) {
                     card.set_memory_state(&fsrs, Some(item), historical_retention.unwrap())?;
                     card.desired_retention = desired_retention;
+                    card.decay = decay;
                     // if rescheduling
                     if let Some(reviews) = &last_revlog_info {
                         // and we have a last review time for the card
@@ -242,6 +254,7 @@ pub(crate) struct FsrsItemForMemoryState {
     /// When revlogs have been truncated, this stores the initial state at first
     /// review
     pub starting_state: Option<MemoryState>,
+    pub filtered_revlogs: Vec<RevlogEntry>,
 }
 
 /// Like [fsrs_item_for_memory_state], but for updating multiple cards at once.
@@ -330,6 +343,7 @@ pub(crate) fn fsrs_item_for_memory_state(
             Ok(Some(FsrsItemForMemoryState {
                 item,
                 starting_state: None,
+                filtered_revlogs: output.filtered_revlogs,
             }))
         } else if let Some(first_user_grade) = output.filtered_revlogs.first() {
             // the revlog has been truncated, but not fully
@@ -356,6 +370,7 @@ pub(crate) fn fsrs_item_for_memory_state(
             Ok(Some(FsrsItemForMemoryState {
                 item,
                 starting_state: Some(starting_state),
+                filtered_revlogs: output.filtered_revlogs,
             }))
         } else {
             // only manual and rescheduled revlogs; treat like empty

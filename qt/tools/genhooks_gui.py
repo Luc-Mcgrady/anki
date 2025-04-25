@@ -549,6 +549,10 @@ hooks = [
          You can modify context.search to change the text that is sent to the
          searching backend.
 
+         If you need to pass metadata to the browser_did_search hook, you can
+         do it with context.addon_metadata. For example, to trigger filtering
+         based on a new custom filter.
+
          If you set context.ids to a list of ids, the regular search will
          not be performed, and the provided ids will be used instead.
 
@@ -577,6 +581,9 @@ hooks = [
         You can mutate the row object to change what is displayed. Any columns the
         backend did not recognize will be returned as an empty string, and can be
         replaced with custom content.
+
+        You can retrieve metadata passed from browser_will_search with
+        context.addon_metadata (for example to trigger post-processing filtering).
 
         Columns is a list of string values identifying what each column in the row
         represents.
@@ -778,24 +785,24 @@ hooks = [
         name="webview_did_inject_style_into_page",
         args=["webview: aqt.webview.AnkiWebView"],
         doc='''Called after standard styling is injected into an external
-html file, such as when loading the new graphs. You can use this hook to
-mutate the DOM before the page is revealed.
-
-For example:
-
-def mytest(webview: AnkiWebView):
-    if webview.kind != AnkiWebViewKind.DECK_STATS:
-        return
-    web.eval(
-        """
-    div = document.createElement("div");
-    div.innerHTML = 'hello';
-    document.body.appendChild(div);
-"""
-    )
-
-gui_hooks.webview_did_inject_style_into_page.append(mytest)
-''',
+        html file, such as when loading the new graphs. You can use this hook to
+        mutate the DOM before the page is revealed.
+        
+        For example:
+        
+        def mytest(webview: AnkiWebView):
+            if webview.kind != AnkiWebViewKind.DECK_STATS:
+                return
+            webview.eval(
+                """
+                div = document.createElement("div");
+                div.innerHTML = 'hello';
+                document.body.appendChild(div);
+                """
+            )
+        
+        gui_hooks.webview_did_inject_style_into_page.append(mytest)
+        ''',
     ),
     # Main
     ###################

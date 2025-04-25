@@ -151,7 +151,10 @@ class ModelManager(DeprecatedNamesMixin):
             return None
 
     def get(self, id: NotetypeId) -> NotetypeDict | None:
-        "Get model with ID, or None."
+        """Get model with ID, or None.
+
+        This returns a reference to a cached dict. Copy the returned model before modifying it if you're not calling .update_dict() afterward.
+        """
         # deal with various legacy input types
         if id is None:
             return None
@@ -277,6 +280,10 @@ class ModelManager(DeprecatedNamesMixin):
 
     def sort_idx(self, notetype: NotetypeDict) -> int:
         return notetype["sortf"]
+
+    def cloze_fields(self, mid: NotetypeId) -> Sequence[int]:
+        """The list of index of fields that are used by cloze deletion in the note type with id `mid`."""
+        return self.col._backend.get_cloze_field_ords(mid)
 
     # Adding & changing fields
     ##################################################

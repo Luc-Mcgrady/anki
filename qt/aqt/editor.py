@@ -320,7 +320,6 @@ require("anki/ui").loaded.then(() => require("anki/NoteEditor").instances[0].too
             label_element = cmd
 
         title_attribute = shortcut(title_attribute)
-        cmd_to_toggle_button = "toggleEditorButton(this);" if toggleable else ""
         id_attribute_assignment = f"id={id}" if id else ""
         class_attribute = "linkb" if rightside else "rounded"
         if not disables:
@@ -328,11 +327,11 @@ require("anki/ui").loaded.then(() => require("anki/NoteEditor").instances[0].too
 
         return f"""<button tabindex=-1
                         {id_attribute_assignment}
-                        class="{class_attribute}"
+                        class="anki-addon-button {class_attribute}"
                         type="button"
                         title="{title_attribute}"
-                        onclick="pycmd('{cmd}');{cmd_to_toggle_button}return false;"
-                        onmousedown="window.event.preventDefault();"
+                        data-cantoggle="{int(toggleable)}"
+                        data-command="{cmd}"
                 >
                     {image_element}
                     {label_element}
@@ -556,6 +555,8 @@ require("anki/ui").loaded.then(() => require("anki/NoteEditor").instances[0].too
         note_type = self.note_type()
         flds = note_type["flds"]
         collapsed = [fld["collapsed"] for fld in flds]
+        cloze_fields_ords = self.mw.col.models.cloze_fields(self.note.mid)
+        cloze_fields = [ord in cloze_fields_ords for ord in range(len(flds))]
         plain_texts = [fld.get("plainText", False) for fld in flds]
         descriptions = [fld.get("description", "") for fld in flds]
         notetype_meta = {"id": self.note.mid, "modTime": note_type["mod"]}
@@ -585,6 +586,7 @@ require("anki/ui").loaded.then(() => require("anki/NoteEditor").instances[0].too
             setIsImageOcclusion({json.dumps(self.current_notetype_is_image_occlusion())});
             setNotetypeMeta({json.dumps(notetype_meta)});
             setCollapsed({json.dumps(collapsed)});
+            setClozeFields({json.dumps(cloze_fields)});
             setPlainTexts({json.dumps(plain_texts)});
             setDescriptions({json.dumps(descriptions)});
             setFonts({json.dumps(self.fonts())});
@@ -1053,9 +1055,10 @@ require("anki/ui").loaded.then(() => require("anki/NoteEditor").instances[0].too
             if ret:
                 self.doPaste(html, internal, extended)
 
-        self.web.evalWithCallback(
-            f"focusIfField({cursor_pos.x()}, {cursor_pos.y()});", pasteIfField
-        )
+        zoom = self.web.zoomFactor()
+        x, y = int(cursor_pos.x() / zoom), int(cursor_pos.y() / zoom)
+
+        self.web.evalWithCallback(f"focusIfField({x}, {y});", pasteIfField)
 
     def onPaste(self) -> None:
         self.web.onPaste()
@@ -1496,8 +1499,8 @@ class EditorWebView(AnkiWebView):
 
     def _get_clipboard_html_for_field(self, mode: QClipboard.Mode) -> str | None:
         clip = self._clipboard()
-        mime = clip.mimeData(mode)
-        assert mime is not None
+        if not (mime := clip.mimeData(mode)):
+            return None
         if not mime.hasHtml():
             return None
         return mime.html()
@@ -1539,9 +1542,9 @@ class EditorWebView(AnkiWebView):
             print("reuse internal")
             self.editor.doPaste(html, True, extended)
         else:
+            if not (mime := clipboard.mimeData(mode=mode)):
+                return
             print("use clipboard")
-            mime = clipboard.mimeData(mode=mode)
-            assert mime is not None
             html, internal = self._processMime(mime, extended)
             if html:
                 self.editor.doPaste(html, internal, extended)

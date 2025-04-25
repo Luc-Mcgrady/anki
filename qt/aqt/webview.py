@@ -10,7 +10,9 @@ import re
 import sys
 from collections.abc import Callable, Sequence
 from enum import Enum
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Type, cast
+
+from typing_extensions import TypedDict, Unpack
 
 import anki
 import anki.lang
@@ -28,21 +30,154 @@ serverbaseurl = re.compile(r"^.+:\/\/[^\/]+")
 if TYPE_CHECKING:
     from aqt.mediasrv import PageContext
 
-
-# Page for debug messages
-##########################################################################
-
 BridgeCommandHandler = Callable[[str], Any]
 
 
+class AnkiWebViewKind(Enum):
+    """Enum registry of all web views managed by Anki
+
+    The value of each entry corresponds to the web view's title.
+
+    When introducing a new web view, please add it to the registry below.
+    """
+
+    DEFAULT = "default"
+    MAIN = "main webview"
+    TOP_TOOLBAR = "top toolbar"
+    BOTTOM_TOOLBAR = "bottom toolbar"
+    DECK_OPTIONS = "deck options"
+    EDITOR = "editor"
+    LEGACY_DECK_STATS = "legacy deck stats"
+    DECK_STATS = "deck stats"
+    PREVIEWER = "previewer"
+    CHANGE_NOTETYPE = "change notetype"
+    CARD_LAYOUT = "card layout"
+    BROWSER_CARD_INFO = "browser card info"
+    IMPORT_CSV = "csv import"
+    EMPTY_CARDS = "empty cards"
+    FIND_DUPLICATES = "find duplicates"
+    FIELDS = "fields"
+    IMPORT_LOG = "import log"
+    IMPORT_ANKI_PACKAGE = "anki package import"
+
+
+class AuthInterceptor(QWebEngineUrlRequestInterceptor):
+    _api_enabled = False
+
+    def __init__(self, parent: QObject | None = None, api_enabled: bool = False):
+        super().__init__(parent)
+        self._api_enabled = api_enabled
+
+    def interceptRequest(self, info):
+        from aqt.mediasrv import _APIKEY
+
+        if self._api_enabled and info.requestUrl().host() == "127.0.0.1":
+            info.setHttpHeader(b"Authorization", f"Bearer {_APIKEY}".encode("utf-8"))
+
+
+def _create_bridge_script() -> QWebEngineScript:
+    qwebchannel = ":/qtwebchannel/qwebchannel.js"
+    jsfile = QFile(qwebchannel)
+    if not jsfile.open(QIODevice.OpenModeFlag.ReadOnly):
+        print(f"Error opening '{qwebchannel}': {jsfile.error()}", file=sys.stderr)
+    jstext = bytes(cast(bytes, jsfile.readAll())).decode("utf-8")
+    jsfile.close()
+
+    script = QWebEngineScript()
+    script.setSourceCode(
+        jstext
+        + """
+        var pycmd, bridgeCommand;
+        new QWebChannel(qt.webChannelTransport, function(channel) {
+            bridgeCommand = pycmd = function (arg, cb) {
+                var resultCB = function (res) {
+                    // pass result back to user-provided callback
+                    if (cb) {
+                        cb(JSON.parse(res));
+                    }
+                }
+            
+                channel.objects.py.cmd(arg, resultCB);
+                return false;                   
+            }
+            pycmd("domDone");
+        });
+    """
+    )
+    script.setWorldId(QWebEngineScript.ScriptWorldId.MainWorld)
+    script.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentReady)
+    script.setRunsOnSubFrames(False)
+
+    return script
+
+
+_bridge_script = _create_bridge_script()
+
+_profile_with_api_access: QWebEngineProfile | None = None
+_profile_without_api_access: QWebEngineProfile | None = None
+
+
 class AnkiWebPage(QWebEnginePage):
-    def __init__(self, onBridgeCmd: BridgeCommandHandler) -> None:
-        QWebEnginePage.__init__(self)
+    def __init__(
+        self,
+        onBridgeCmd: BridgeCommandHandler,
+        kind: AnkiWebViewKind = AnkiWebViewKind.DEFAULT,
+        parent: QObject | None = None,
+    ) -> None:
+        profile = self._profileForPage(kind)
+        self._inject_user_script(profile, _bridge_script)
+        QWebEnginePage.__init__(self, profile, parent)
         self._onBridgeCmd = onBridgeCmd
+        self._kind = kind
         self._setupBridge()
         self.open_links_externally = True
 
+    def _profileForPage(self, kind: AnkiWebViewKind) -> QWebEngineProfile:
+        have_api_access = kind in (
+            AnkiWebViewKind.DECK_OPTIONS,
+            AnkiWebViewKind.EDITOR,
+            AnkiWebViewKind.DECK_STATS,
+            AnkiWebViewKind.CHANGE_NOTETYPE,
+            AnkiWebViewKind.BROWSER_CARD_INFO,
+            AnkiWebViewKind.IMPORT_ANKI_PACKAGE,
+            AnkiWebViewKind.IMPORT_CSV,
+            AnkiWebViewKind.IMPORT_LOG,
+        )
+
+        global _profile_with_api_access, _profile_without_api_access
+
+        # Use cached profile if available
+        if have_api_access and _profile_with_api_access is not None:
+            return _profile_with_api_access
+        elif not have_api_access and _profile_without_api_access is not None:
+            return _profile_without_api_access
+
+        # Create a new profile if not cached
+        profile = QWebEngineProfile()
+
+        interceptor = AuthInterceptor(profile, api_enabled=have_api_access)
+        profile.setUrlRequestInterceptor(interceptor)
+        if have_api_access:
+            _profile_with_api_access = profile
+        else:
+            _profile_without_api_access = profile
+
+        return profile
+
     def _setupBridge(self) -> None:
+        # Add-on compatibility: For existing add-on callers that override the init
+        # and invoke _setupBridge directly (e.g. in order to use a custom web profile),
+        # we need to ensure that the bridge script is injected into the profile scripts,
+        # if it has yet to be injected.
+        profile = self.profile()
+        assert profile is not None
+        scripts = profile.scripts()
+        assert scripts is not None
+
+        if not scripts.contains(_bridge_script):
+            print("add-on callers should not call _setupBridge directly")
+            self._inject_user_script(profile, _bridge_script)
+
         class Bridge(QObject):
             def __init__(self, bridge_handler: Callable[[str], Any]) -> None:
                 super().__init__()
@@ -58,40 +193,9 @@ class AnkiWebPage(QWebEnginePage):
         self._channel.registerObject("py", self._bridge)
         self.setWebChannel(self._channel)
 
-        qwebchannel = ":/qtwebchannel/qwebchannel.js"
-        jsfile = QFile(qwebchannel)
-        if not jsfile.open(QIODevice.OpenModeFlag.ReadOnly):
-            print(f"Error opening '{qwebchannel}': {jsfile.error()}", file=sys.stderr)
-        jstext = bytes(cast(bytes, jsfile.readAll())).decode("utf-8")
-        jsfile.close()
-
-        script = QWebEngineScript()
-        script.setSourceCode(
-            jstext
-            + """
-            var pycmd, bridgeCommand;
-            new QWebChannel(qt.webChannelTransport, function(channel) {
-                bridgeCommand = pycmd = function (arg, cb) {
-                    var resultCB = function (res) {
-                        // pass result back to user-provided callback
-                        if (cb) {
-                            cb(JSON.parse(res));
-                        }
-                    }
-                
-                    channel.objects.py.cmd(arg, resultCB);
-                    return false;                   
-                }
-                pycmd("domDone");
-            });
-        """
-        )
-        script.setWorldId(QWebEngineScript.ScriptWorldId.MainWorld)
-        script.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentReady)
-        script.setRunsOnSubFrames(False)
-
-        profile = self.profile()
-        assert profile is not None
+    def _inject_user_script(
+        self, profile: QWebEngineProfile, script: QWebEngineScript
+    ) -> None:
         scripts = profile.scripts()
         assert scripts is not None
         scripts.insert(script)
@@ -247,34 +351,6 @@ class WebContent:
 ##########################################################################
 
 
-class AnkiWebViewKind(Enum):
-    """Enum registry of all web views managed by Anki
-
-    The value of each entry corresponds to the web view's title.
-
-    When introducing a new web view, please add it to the registry below.
-    """
-
-    DEFAULT = "default"
-    MAIN = "main webview"
-    TOP_TOOLBAR = "top toolbar"
-    BOTTOM_TOOLBAR = "bottom toolbar"
-    DECK_OPTIONS = "deck options"
-    EDITOR = "editor"
-    LEGACY_DECK_STATS = "legacy deck stats"
-    DECK_STATS = "deck stats"
-    PREVIEWER = "previewer"
-    CHANGE_NOTETYPE = "change notetype"
-    CARD_LAYOUT = "card layout"
-    BROWSER_CARD_INFO = "browser card info"
-    IMPORT_CSV = "csv import"
-    EMPTY_CARDS = "empty cards"
-    FIND_DUPLICATES = "find duplicates"
-    FIELDS = "fields"
-    IMPORT_LOG = "import log"
-    IMPORT_ANKI_PACKAGE = "anki package import"
-
-
 class AnkiWebView(QWebEngineView):
     allow_drops = False
     _kind: AnkiWebViewKind
@@ -286,12 +362,11 @@ class AnkiWebView(QWebEngineView):
         kind: AnkiWebViewKind = AnkiWebViewKind.DEFAULT,
     ) -> None:
         QWebEngineView.__init__(self, parent=parent)
-        self.set_kind(kind)
-        if title:
-            self.set_title(title)
-        self._page = AnkiWebPage(self._onBridgeCmd)
+        self._kind = kind
+        self.set_title(kind.value)
+        self.setPage(AnkiWebPage(self._onBridgeCmd, kind, self))
         # reduce flicker
-        self._page.setBackgroundColor(theme_manager.qcolor(colors.CANVAS))
+        self.page().setBackgroundColor(theme_manager.qcolor(colors.CANVAS))
 
         # in new code, use .set_bridge_command() instead of setting this directly
         self.onBridgeCmd: Callable[[str], Any] = self.defaultOnBridgeCmd
@@ -299,7 +374,6 @@ class AnkiWebView(QWebEngineView):
         self._domDone = True
         self._pendingActions: list[tuple[str, Sequence[Any]]] = []
         self.requiresCol = True
-        self.setPage(self._page)
         self._disable_zoom = False
 
         self.resetHandlers()
@@ -320,9 +394,8 @@ class AnkiWebView(QWebEngineView):
         """
         )
 
-    def set_kind(self, kind: AnkiWebViewKind) -> None:
-        self._kind = kind
-        self.set_title(kind.value)
+    def page(self) -> AnkiWebPage:
+        return cast(AnkiWebPage, super().page())
 
     @property
     def kind(self) -> AnkiWebViewKind:
@@ -350,14 +423,17 @@ class AnkiWebView(QWebEngineView):
             isinstance(evt, QMouseEvent)
             and evt.type() == QEvent.Type.MouseButtonRelease
         ):
+            from aqt import mw
+
             if evt.button() == Qt.MouseButton.MiddleButton and is_lin:
-                self.onMiddleClickPaste()
+                if mw.pm.middle_click_paste_enabled():
+                    self.onMiddleClickPaste()
                 return True
 
         return False
 
     def set_open_links_externally(self, enable: bool) -> None:
-        self._page.open_links_externally = enable
+        self.page().open_links_externally = enable
 
     def onEsc(self) -> None:
         w = self.parent()
@@ -822,7 +898,7 @@ html {{ {font} }}
         Must be done on Windows prior to changing current working directory."""
         self.requiresCol = False
         self._domReady = False
-        self._page.setContent(cast(QByteArray, bytes("", "ascii")))
+        self.page().setContent(cast(QByteArray, bytes("", "ascii")))
 
     def cleanup(self) -> None:
         try:
@@ -836,14 +912,14 @@ html {{ {font} }}
         # defer page cleanup so that in-flight requests have a chance to complete first
         # https://forums.ankiweb.net/t/error-when-exiting-browsing-when-the-software-is-installed-in-the-path-c-program-files-anki/38363
         mw.progress.single_shot(5000, lambda: mw.mediaServer.clear_page_html(id(self)))
-        self._page.deleteLater()
+        self.page().deleteLater()
 
     def on_theme_did_change(self) -> None:
         # avoid flashes if page reloaded
-        self._page.setBackgroundColor(theme_manager.qcolor(colors.CANVAS))
+        self.page().setBackgroundColor(theme_manager.qcolor(colors.CANVAS))
         if hasattr(QWebEngineSettings.WebAttribute, "ForceDarkMode"):
             force_dark_mode = getattr(QWebEngineSettings.WebAttribute, "ForceDarkMode")
-            page_settings = self._page.settings()
+            page_settings = self.page().settings()
             if page_settings is not None:
                 page_settings.setAttribute(
                     force_dark_mode,
@@ -885,3 +961,53 @@ html {{ {font} }}
     @deprecated(info="use theme_manager.qcolor() instead")
     def get_window_bg_color(self, night_mode: bool | None = None) -> QColor:
         return theme_manager.qcolor(colors.CANVAS)
+
+
+# Pre-configured classes for use in Qt Designer
+##########################################################################
+
+
+class _AnkiWebViewKwargs(TypedDict, total=False):
+    parent: QWidget | None
+    title: str
+    kind: AnkiWebViewKind
+
+
+def _create_ankiwebview_subclass(
+    name: str,
+    /,
+    **fixed_kwargs: Unpack[_AnkiWebViewKwargs],
+) -> Type[AnkiWebView]:
+
+    def __init__(self, *args: Any, **kwargs: _AnkiWebViewKwargs) -> None:
+        # user‑supplied kwargs override fixed kwargs
+        merged = cast(_AnkiWebViewKwargs, {**fixed_kwargs, **kwargs})
+        AnkiWebView.__init__(self, *args, **merged)
+
+    __init__.__qualname__ = f"{name}.__init__"
+    if fixed_kwargs:
+        __init__.__doc__ = (
+            f"Auto‑generated wrapper that pre‑sets "
+            f"{', '.join(f'{k}={v!r}' for k, v in fixed_kwargs.items())}."
+        )
+
+    cls: Type[AnkiWebView] = type(name, (AnkiWebView,), {"__init__": __init__})
+
+    return cls
+
+
+# These subclasses are used in Qt Designer UI files to allow for configuring
+# web views at initialization time (custom widgets can otherwise only be
+# initialized with the default constructor)
+StatsWebView = _create_ankiwebview_subclass(
+    "StatsWebView", kind=AnkiWebViewKind.DECK_STATS
+)
+LegacyStatsWebView = _create_ankiwebview_subclass(
+    "LegacyStatsWebView", kind=AnkiWebViewKind.LEGACY_DECK_STATS
+)
+EmptyCardsWebView = _create_ankiwebview_subclass(
+    "EmptyCardsWebView", kind=AnkiWebViewKind.EMPTY_CARDS
+)
+FindDupesWebView = _create_ankiwebview_subclass(
+    "FindDupesWebView", kind=AnkiWebViewKind.FIND_DUPLICATES
+)

@@ -17,6 +17,7 @@ use anki_proto::scheduler::FuzzDeltaResponse;
 use anki_proto::scheduler::GetOptimalRetentionParametersResponse;
 use anki_proto::scheduler::SimulateFsrsReviewRequest;
 use anki_proto::scheduler::SimulateFsrsReviewResponse;
+use fsrs::ComputeParametersInput;
 use fsrs::FSRSItem;
 use fsrs::FSRSReview;
 use fsrs::FSRS;
@@ -320,17 +321,31 @@ impl crate::services::SchedulerService for Collection {
             learn_span: simulator_config.learn_span as u32,
             max_cost_perday: simulator_config.max_cost_perday,
             max_ivl: simulator_config.max_ivl,
-            learn_costs: simulator_config.learn_costs.to_vec(),
-            review_costs: simulator_config.review_costs.to_vec(),
             first_rating_prob: simulator_config.first_rating_prob.to_vec(),
             review_rating_prob: simulator_config.review_rating_prob.to_vec(),
-            first_rating_offsets: simulator_config.first_rating_offsets.to_vec(),
-            first_session_lens: simulator_config.first_session_lens.to_vec(),
-            forget_rating_offset: simulator_config.forget_rating_offset,
-            forget_session_len: simulator_config.forget_session_len,
-            loss_aversion: simulator_config.loss_aversion,
+            loss_aversion: 1.0,
             learn_limit: simulator_config.learn_limit as u32,
             review_limit: simulator_config.review_limit as u32,
+            learning_step_transitions: simulator_config
+                .learning_step_transitions
+                .iter()
+                .flatten()
+                .cloned()
+                .collect(),
+            relearning_step_transitions: simulator_config
+                .relearning_step_transitions
+                .iter()
+                .flatten()
+                .cloned()
+                .collect(),
+            state_rating_costs: simulator_config
+                .state_rating_costs
+                .iter()
+                .flatten()
+                .cloned()
+                .collect(),
+            learning_step_count: simulator_config.learning_step_count as u32,
+            relearning_step_count: simulator_config.relearning_step_count as u32,
         })
     }
 
@@ -352,11 +367,12 @@ impl crate::services::BackendSchedulerService for Backend {
     ) -> Result<scheduler::ComputeFsrsParamsResponse> {
         let fsrs = FSRS::new(None)?;
         let fsrs_items = req.items.len() as u32;
-        let params = fsrs.compute_parameters(
-            req.items.into_iter().map(fsrs_item_proto_to_fsrs).collect(),
-            None,
-            true,
-        )?;
+        let params = fsrs.compute_parameters(ComputeParametersInput {
+            train_set: req.items.into_iter().map(fsrs_item_proto_to_fsrs).collect(),
+            progress: None,
+            enable_short_term: true,
+            num_relearning_steps: None,
+        })?;
         Ok(ComputeFsrsParamsResponse { params, fsrs_items })
     }
 
@@ -370,7 +386,12 @@ impl crate::services::BackendSchedulerService for Backend {
             .into_iter()
             .map(fsrs_item_proto_to_fsrs)
             .collect();
-        let params = fsrs.benchmark(train_set, true);
+        let params = fsrs.benchmark(ComputeParametersInput {
+            train_set,
+            progress: None,
+            enable_short_term: true,
+            num_relearning_steps: None,
+        });
         Ok(FsrsBenchmarkResponse { params })
     }
 

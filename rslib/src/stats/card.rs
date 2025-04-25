@@ -2,8 +2,10 @@
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 use fsrs::FSRS;
+use fsrs::FSRS5_DEFAULT_DECAY;
 
 use crate::card::CardType;
+use crate::card::FsrsMemoryState;
 use crate::prelude::*;
 use crate::revlog::RevlogEntry;
 use crate::scheduler::fsrs::memory_state::fsrs_item_for_memory_state;
@@ -36,10 +38,11 @@ impl Collection {
         let fsrs_retrievability = card
             .memory_state
             .zip(Some(days_elapsed))
-            .map(|(state, days)| {
+            .zip(Some(card.decay.unwrap_or(FSRS5_DEFAULT_DECAY)))
+            .map(|((state, days), decay)| {
                 FSRS::new(None)
                     .unwrap()
-                    .current_retrievability(state.into(), days)
+                    .current_retrievability(state.into(), days, decay)
             });
 
         let original_deck = if card.original_deck_id == DeckId(0) {
@@ -74,6 +77,7 @@ impl Collection {
             memory_state: card.memory_state.map(Into::into),
             fsrs_retrievability,
             custom_data: card.custom_data,
+            fsrs_params: preset.fsrs_params().to_vec(),
             preset: preset.name,
             original_deck: if original_deck != deck {
                 Some(original_deck.human_name())
@@ -140,26 +144,40 @@ impl Collection {
         let ignore_before = ignore_revlogs_before_ms_from_config(&config)?;
 
         let mut result = Vec::new();
-        let mut accumulated_revlog = Vec::new();
-
-        for entry in revlog {
-            accumulated_revlog.push(entry.clone());
-            let item = fsrs_item_for_memory_state(
-                &fsrs,
-                accumulated_revlog.clone(),
-                next_day_at,
-                historical_retention,
-                ignore_before,
-            )?;
-            let mut card_clone = card.clone();
-            card_clone.set_memory_state(&fsrs, item, historical_retention)?;
-
-            let mut stats_entry = stats_revlog_entry(&entry);
-            stats_entry.memory_state = card_clone.memory_state.map(Into::into);
-            result.push(stats_entry);
+        if let Some(item) = fsrs_item_for_memory_state(
+            &fsrs,
+            revlog.clone(),
+            next_day_at,
+            historical_retention,
+            ignore_before,
+        )? {
+            let memory_states = fsrs.historical_memory_states(item.item, item.starting_state)?;
+            let mut revlog_index = 0;
+            for entry in revlog {
+                let mut stats_entry = stats_revlog_entry(&entry);
+                let memory_state: Option<FsrsMemoryState> = if revlog_index >= memory_states.len() {
+                    // The removed revlog is in the end of the revlog, so we use the last memory
+                    // state
+                    Some(memory_states[memory_states.len() - 1].into())
+                } else if entry.id == item.filtered_revlogs[revlog_index].id {
+                    revlog_index += 1;
+                    Some(memory_states[revlog_index - 1].into())
+                } else if revlog_index == 0 {
+                    // The removed revlog is in the start of the revlog, so we don't have a memory
+                    // state for it
+                    None
+                } else {
+                    // The removed revlog is in the middle of the revlog, so we use the memory
+                    // state for the previous revlog entry
+                    Some(memory_states[revlog_index].into())
+                };
+                stats_entry.memory_state = memory_state.map(|s| s.into());
+                result.push(stats_entry);
+            }
+            Ok(result.into_iter().rev().collect())
+        } else {
+            Ok(revlog.iter().map(stats_revlog_entry).collect())
         }
-
-        Ok(result.into_iter().rev().collect())
     }
 }
 

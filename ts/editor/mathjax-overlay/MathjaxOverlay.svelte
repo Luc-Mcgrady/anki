@@ -20,7 +20,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     import { isComposing } from "$lib/sveltelib/composition";
 
     import { escapeSomeEntities, unescapeSomeEntities } from "../../editable/mathjax";
-    import { Mathjax } from "../../editable/mathjax-element";
+    import { Mathjax } from "../../editable/mathjax-element.svelte";
     import type { EditingInputAPI } from "../EditingArea.svelte";
     import HandleBackground from "../HandleBackground.svelte";
     import { context } from "../NoteEditor.svelte";
@@ -34,6 +34,8 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     let cleanup: Callback;
     let richTextInput: RichTextInputAPI | null = null;
     let allowPromise = Promise.resolve();
+    // Whether the last focused input field corresponds to a cloze field.
+    let isClozeField: boolean = true;
 
     async function initialize(input: EditingInputAPI | null): Promise<void> {
         cleanup?.();
@@ -50,6 +52,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
                 on(container, "movecaretafter" as any, showOnAutofocus),
                 on(container, "selectall" as any, showSelectAll),
             );
+            isClozeField = input.isClozeField;
         }
 
         // Wait if the mathjax overlay is still active
@@ -242,6 +245,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
                         <MathjaxButtons
                             {isBlock}
+                            {isClozeField}
                             on:setinline={async () => {
                                 isBlock = false;
                                 await updateBlockAttribute();

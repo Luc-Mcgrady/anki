@@ -85,6 +85,7 @@ fn row_to_card(row: &Row) -> result::Result<Card, rusqlite::Error> {
         original_position: data.original_position,
         memory_state: data.memory_state(),
         desired_retention: data.fsrs_desired_retention,
+        decay: data.decay,
         custom_data: data.custom_data,
     })
 }
@@ -730,6 +731,20 @@ impl super::SqliteStorage {
         self.db.prepare(&sql)?.execute(params![self.usn(server)?])?;
 
         Ok(())
+    }
+
+    pub(crate) fn get_card_count_with_ignore_before(
+        &self,
+        ignore_before: TimestampMillis,
+    ) -> Result<u64> {
+        Ok(self
+            .db
+            .prepare(include_str!("get_ignored_before_count.sql"))?
+            .query(params![ignore_before.0])?
+            .next()
+            .unwrap()
+            .unwrap()
+            .get(0)?)
     }
 
     #[cfg(test)]
