@@ -9,6 +9,7 @@ use crate::scheduler::fsrs::memory_state::fsrs_items_for_memory_states;
 
 impl GraphsContext {
     pub fn historical_fsrs(&self) -> Result<Vec<f32>> {
+        dbg!("items_for_memory_states");
         let fsrs = FSRS::new(Some(&DEFAULT_PARAMETERS)).unwrap();
         let items = fsrs_items_for_memory_states(
             &fsrs,
@@ -17,6 +18,7 @@ impl GraphsContext {
             0.9,
             0.into(),
         )?;
+        dbg!("historical_memory_states");
         let memory_states = items
             .into_iter()
             .filter_map(|(_cid, item)| {
@@ -29,6 +31,7 @@ impl GraphsContext {
             })
             .collect_vec();
 
+        dbg!("historical_retention");
         let mut retention = vec![0.; self.days_elapsed as usize];
         for (revlogs, memory_states) in memory_states {
             if let Ok(memory_states) = memory_states {
