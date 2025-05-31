@@ -54,9 +54,17 @@ impl GraphsContext {
         let mut retention = vec![0.; self.days_elapsed as usize];
         for (revlogs, memory_states) in memory_states {
             if let Ok(memory_states) = memory_states {
-                for (from_to, memory_state) in izip!(revlogs.windows(2), memory_states) {
-                    let start_day = from_to[1].days_elapsed(self.next_day_start) as usize;
-                    let end_day = from_to[0].days_elapsed(self.next_day_start) as usize;
+                for (from_to, memory_state) in izip!(
+                    revlogs
+                        .into_iter()
+                        .map(|r| r.days_elapsed(self.next_day_start) as usize)
+                        .chain([0])
+                        .collect_vec()
+                        .windows(2),
+                    memory_states
+                ) {
+                    let start_day = from_to[1];
+                    let end_day = from_to[0];
                     for (i, day) in retention
                         .iter_mut()
                         .take(end_day)
