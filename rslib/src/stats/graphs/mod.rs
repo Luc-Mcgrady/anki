@@ -8,6 +8,7 @@ mod eases;
 mod future_due;
 mod hours;
 mod intervals;
+mod memorized;
 mod retention;
 mod retrievability;
 mod reviews;
