@@ -1,33 +1,11 @@
-use crate::{
-    prelude::*,
-    scheduler::fsrs::memory_state::{self, fsrs_items_for_memory_states},
-};
-use anki_proto::stats::RevlogEntry;
-use fsrs::{DEFAULT_PARAMETERS, FSRS};
-use itertools::{izip, Itertools};
+use fsrs::DEFAULT_PARAMETERS;
+use fsrs::FSRS;
+use itertools::izip;
+use itertools::Itertools;
 
-use super::{retention, GraphsContext};
-
-#[derive(Debug, Clone)]
-pub struct HistoricalReviewLog {
-    pub cid: i64,
-    pub day: i64,
-    pub rating: u32,
-}
-
-#[derive(Debug, Clone)]
-pub struct RangeBounds {
-    pub from: u64,
-    pub to: u64,
-}
-
-pub fn convert_review_log_for_historical(log: RevlogEntry) -> HistoricalReviewLog {
-    HistoricalReviewLog {
-        cid: log.cid,
-        day: log.id,
-        rating: log.button_chosen,
-    }
-}
+use super::GraphsContext;
+use crate::prelude::*;
+use crate::scheduler::fsrs::memory_state::fsrs_items_for_memory_states;
 
 impl GraphsContext {
     pub fn historical_fsrs(&self) -> Result<Vec<f32>> {
