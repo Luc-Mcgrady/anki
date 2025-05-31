@@ -63,6 +63,7 @@ impl Collection {
             next_day_start: timing.next_day_at,
             local_offset_secs,
         };
+        ctx.historical_fsrs().unwrap();
         let (eases, difficulty) = ctx.eases();
         let resp = anki_proto::stats::GraphsResponse {
             added: Some(ctx.added_days()),
