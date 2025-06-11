@@ -9,19 +9,26 @@ use itertools::Itertools;
 
 use super::GraphsContext;
 use crate::prelude::*;
-use crate::scheduler::fsrs::memory_state::fsrs_items_for_memory_states;
+use crate::scheduler::fsrs::memory_state::fsrs_item_for_memory_state;
 
 impl GraphsContext {
     pub fn historical_fsrs(&self) -> Result<HashMap<usize, f32>> {
         let fsrs = FSRS::new(Some(&DEFAULT_PARAMETERS)).unwrap();
-        let items = fsrs_items_for_memory_states(
-            &fsrs,
-            self.revlog.clone(),
-            self.next_day_start,
-            0.9,
-            0.into(),
-        )?;
-        let memory_states = items.into_iter().filter_map(|(_cid, item)| {
+
+        let card_logs = self.revlog.clone().into_iter().chunk_by(|r| r.cid);
+
+        let items = card_logs.into_iter().filter_map(|(_card_id, group)| {
+            fsrs_item_for_memory_state(
+                &fsrs,
+                group.collect_vec(),
+                self.next_day_start,
+                0.9,
+                0.into(),
+            )
+            .ok()
+        });
+
+        let memory_states = items.into_iter().filter_map(|item| {
             item.map(|item| {
                 (
                     item.filtered_revlogs,
