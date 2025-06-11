@@ -20,10 +20,10 @@ impl GraphsContext {
         )?;
         dbg!("historical_memory_states");
         let memory_states = items.into_iter().filter_map(|(_cid, item)| {
-            item.as_ref().map(|item| {
+            item.map(|item| {
                 (
-                    item.filtered_revlogs.clone(),
-                    fsrs.historical_memory_states(item.item.clone(), None),
+                    item.filtered_revlogs,
+                    fsrs.historical_memory_states(item.item, item.starting_state),
                 )
             })
         });
