@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use fsrs::DEFAULT_PARAMETERS;
 use fsrs::FSRS;
 use itertools::izip;
@@ -6,9 +8,10 @@ use itertools::Itertools;
 use super::GraphsContext;
 use crate::prelude::*;
 use crate::scheduler::fsrs::memory_state::fsrs_items_for_memory_states;
+use crate::scheduler::new;
 
 impl GraphsContext {
-    pub fn historical_fsrs(&self) -> Result<Vec<f32>> {
+    pub fn historical_fsrs(&self) -> Result<HashMap<usize, f32>> {
         dbg!("items_for_memory_states");
         let fsrs = FSRS::new(Some(&DEFAULT_PARAMETERS)).unwrap();
         let items = fsrs_items_for_memory_states(
@@ -29,7 +32,7 @@ impl GraphsContext {
         });
 
         dbg!("historical_retention");
-        let mut retention = vec![0.; self.days_elapsed as usize];
+        let mut retention = HashMap::new();
         for (revlogs, memory_states) in memory_states {
             if let Ok(memory_states) = memory_states {
                 for (from_to, memory_state) in izip!(
@@ -43,13 +46,9 @@ impl GraphsContext {
                 ) {
                     let start_day = from_to[1];
                     let end_day = from_to[0];
-                    for (i, day) in retention
-                        .iter_mut()
-                        .take(end_day)
-                        .skip(start_day)
-                        .enumerate()
-                    {
-                        *day += fsrs.current_retrievability(memory_state, i as u32, 0.2);
+                    for i in start_day..end_day {
+                        *retention.entry(i).or_default() +=
+                            fsrs.current_retrievability(memory_state, i as u32, 0.2);
                     }
                 }
             }
