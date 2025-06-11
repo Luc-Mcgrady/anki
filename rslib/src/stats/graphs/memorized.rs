@@ -1,3 +1,5 @@
+// Copyright: Ankitects Pty Ltd and contributors
+// License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 use std::collections::HashMap;
 
 use fsrs::DEFAULT_PARAMETERS;
@@ -8,11 +10,9 @@ use itertools::Itertools;
 use super::GraphsContext;
 use crate::prelude::*;
 use crate::scheduler::fsrs::memory_state::fsrs_items_for_memory_states;
-use crate::scheduler::new;
 
 impl GraphsContext {
     pub fn historical_fsrs(&self) -> Result<HashMap<usize, f32>> {
-        dbg!("items_for_memory_states");
         let fsrs = FSRS::new(Some(&DEFAULT_PARAMETERS)).unwrap();
         let items = fsrs_items_for_memory_states(
             &fsrs,
@@ -21,7 +21,6 @@ impl GraphsContext {
             0.9,
             0.into(),
         )?;
-        dbg!("historical_memory_states");
         let memory_states = items.into_iter().filter_map(|(_cid, item)| {
             item.map(|item| {
                 (
@@ -31,7 +30,6 @@ impl GraphsContext {
             })
         });
 
-        dbg!("historical_retention");
         let mut retention = HashMap::new();
         for (revlogs, memory_states) in memory_states {
             if let Ok(memory_states) = memory_states {
@@ -53,8 +51,6 @@ impl GraphsContext {
                 }
             }
         }
-
-        dbg!(&retention);
 
         Ok(retention)
     }
