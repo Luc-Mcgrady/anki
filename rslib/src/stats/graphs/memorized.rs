@@ -32,22 +32,21 @@ impl GraphsContext {
 
         let mut retention = HashMap::new();
         for (revlogs, memory_states) in memory_states {
-            if let Ok(memory_states) = memory_states {
-                for (from_to, memory_state) in izip!(
-                    revlogs
-                        .into_iter()
-                        .map(|r| r.days_elapsed(self.next_day_start) as usize)
-                        .chain([0])
-                        .collect_vec()
-                        .windows(2),
-                    memory_states
-                ) {
-                    let start_day = from_to[1];
-                    let end_day = from_to[0];
-                    for i in start_day..end_day {
-                        *retention.entry(i).or_default() +=
-                            fsrs.current_retrievability(memory_state, i as u32, 0.2);
-                    }
+            let memory_states = memory_states?;
+            for (from_to, memory_state) in izip!(
+                revlogs
+                    .into_iter()
+                    .map(|r| r.days_elapsed(self.next_day_start) as usize)
+                    .chain([0])
+                    .collect_vec()
+                    .windows(2),
+                memory_states
+            ) {
+                let start_day = from_to[1];
+                let end_day = from_to[0];
+                for i in start_day..end_day {
+                    *retention.entry(i).or_default() +=
+                        fsrs.current_retrievability(memory_state, i as u32, 0.2);
                 }
             }
         }
