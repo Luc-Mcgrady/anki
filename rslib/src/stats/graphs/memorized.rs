@@ -19,17 +19,14 @@ impl GraphsContext {
             0.into(),
         )?;
         dbg!("historical_memory_states");
-        let memory_states = items
-            .into_iter()
-            .filter_map(|(_cid, item)| {
-                item.as_ref().map(|item| {
-                    (
-                        item.filtered_revlogs.clone(),
-                        fsrs.historical_memory_states(item.item.clone(), None),
-                    )
-                })
+        let memory_states = items.into_iter().filter_map(|(_cid, item)| {
+            item.as_ref().map(|item| {
+                (
+                    item.filtered_revlogs.clone(),
+                    fsrs.historical_memory_states(item.item.clone(), None),
+                )
             })
-            .collect_vec();
+        });
 
         dbg!("historical_retention");
         let mut retention = vec![0.; self.days_elapsed as usize];
