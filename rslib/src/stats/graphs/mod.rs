@@ -14,11 +14,14 @@ mod retrievability;
 mod reviews;
 mod today;
 
+use std::collections::HashMap;
+
 use crate::config::BoolKey;
 use crate::config::Weekday;
 use crate::prelude::*;
 use crate::revlog::RevlogEntry;
 use crate::search::SortMode;
+use crate::stats::graphs::memorized::MemorizedContext;
 
 struct GraphsContext {
     revlog: Vec<RevlogEntry>,
@@ -29,17 +32,8 @@ struct GraphsContext {
 }
 
 impl Collection {
-    pub(crate) fn graph_data_for_search(
-        &mut self,
-        search: &str,
-        days: u32,
-    ) -> Result<anki_proto::stats::GraphsResponse> {
-        let guard = self.search_cards_into_table(search, SortMode::NoOrder)?;
+    fn graph_context(&mut self, search: &str, days: u32) -> Result<GraphsContext> {
         let all = search.trim().is_empty();
-        guard.col.graph_data(all, days)
-    }
-
-    fn graph_data(&mut self, all: bool, days: u32) -> Result<anki_proto::stats::GraphsResponse> {
         let timing = self.timing_today()?;
         let revlog_start = if days > 0 {
             timing
@@ -56,14 +50,26 @@ impl Collection {
             self.storage
                 .get_revlog_entries_for_searched_cards_after_stamp(revlog_start)?
         };
-        let ctx = GraphsContext {
+        Ok(GraphsContext {
             revlog,
             days_elapsed: timing.days_elapsed,
             cards: self.storage.all_searched_cards()?,
             next_day_start: timing.next_day_at,
             local_offset_secs,
-        };
-        ctx.historical_fsrs().unwrap();
+        })
+    }
+
+    pub(crate) fn graph_data_for_search(
+        &mut self,
+        search: &str,
+        days: u32,
+    ) -> Result<anki_proto::stats::GraphsResponse> {
+        let ctx = self.graph_context(search, days)?;
+        let guard = self.search_cards_into_table(search, SortMode::NoOrder)?;
+        guard.col.graph_data(ctx)
+    }
+
+    fn graph_data(&mut self, ctx: GraphsContext) -> Result<anki_proto::stats::GraphsResponse> {
         let (eases, difficulty) = ctx.eases();
         let resp = anki_proto::stats::GraphsResponse {
             added: Some(ctx.added_days()),
@@ -111,5 +117,13 @@ impl Collection {
         )?;
         self.set_config_bool_inner(BoolKey::FutureDueShowBacklog, prefs.future_due_show_backlog)?;
         Ok(())
+    }
+
+    fn memorized_context(&mut self, search: &str) -> Result<MemorizedContext> {
+        let ctx = self.graph_context(search, 0)?;
+        Ok(MemorizedContext {
+            graph_context: ctx,
+            per_preset_fsrs: HashMap::new(),
+        })
     }
 }

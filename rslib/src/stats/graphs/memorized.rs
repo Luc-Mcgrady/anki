@@ -11,17 +11,23 @@ use super::GraphsContext;
 use crate::prelude::*;
 use crate::scheduler::fsrs::memory_state::fsrs_item_for_memory_state;
 
-impl GraphsContext {
+pub(crate) struct MemorizedContext {
+    pub graph_context: GraphsContext,
+    pub per_preset_fsrs: HashMap<u64, FSRS>,
+}
+
+impl MemorizedContext {
     pub fn historical_fsrs(&self) -> Result<HashMap<usize, f32>> {
+        let gctx = &self.graph_context;
         let fsrs = FSRS::new(Some(&DEFAULT_PARAMETERS)).unwrap();
 
-        let card_logs = self.revlog.clone().into_iter().chunk_by(|r| r.cid);
+        let card_logs = gctx.revlog.clone().into_iter().chunk_by(|r| r.cid);
 
         let items = card_logs.into_iter().filter_map(|(_card_id, group)| {
             fsrs_item_for_memory_state(
                 &fsrs,
                 group.collect_vec(),
-                self.next_day_start,
+                gctx.next_day_start,
                 0.9,
                 0.into(),
             )
@@ -43,7 +49,7 @@ impl GraphsContext {
             for (from_to, memory_state) in izip!(
                 revlogs
                     .into_iter()
-                    .map(|r| r.days_elapsed(self.next_day_start) as usize)
+                    .map(|r| r.days_elapsed(gctx.next_day_start) as usize)
                     .chain([0])
                     .collect_vec()
                     .windows(2),
