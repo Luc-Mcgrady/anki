@@ -212,7 +212,7 @@ export function renderReviews(
     }
 
     function tooltipText(d: BinType, cumulative: number): string {
-        const day = dayLabel(d.x0!, d.x1!);
+        const day = dayLabel(d.x0!, d.x0! + d.length);
         const totals = totalsForBin(d);
         const dayTotal = valueLabel(sum(totals));
         let buf = `<table><tr><td>${day}</td><td align=end>${dayTotal}</td></tr>`;
