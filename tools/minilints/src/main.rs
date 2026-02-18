@@ -2,6 +2,7 @@
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 use std::cell::LazyCell;
+use std::collections::BTreeMap;
 use std::collections::HashSet;
 use std::env;
 use std::fs;
@@ -148,7 +149,7 @@ impl LintContext {
 
         if last_author == "49699333+dependabot[bot]@users.noreply.github.com" {
             println!("Dependabot whitelisted.");
-            return Ok(());
+            std::process::exit(0);
         } else if all_contributors.contains(last_author.as_str()) {
             return Ok(());
         }
@@ -201,7 +202,8 @@ fn sveltekit_temp_file(path: &str) -> bool {
 }
 
 fn check_cargo_deny() -> Result<()> {
-    Command::run("cargo install cargo-deny@0.18.3")?;
+    // WARNING: make sure to update version in .buildekite/linux as well
+    Command::run("cargo install cargo-deny@0.19.0")?;
     Command::run("cargo deny check")?;
     Ok(())
 }
@@ -254,9 +256,7 @@ fn check_for_unstaged_changes() {
 }
 
 fn generate_licences() -> Result<String> {
-    if which::which("cargo-license").is_err() {
-        Command::run("cargo install cargo-license@0.5.1")?;
-    }
+    Command::run("cargo install cargo-license@0.7.0")?;
     let output = Command::run_with_output([
         "cargo-license",
         "--features",
@@ -267,5 +267,16 @@ fn generate_licences() -> Result<String> {
         "--manifest-path",
         "rslib/Cargo.toml",
     ])?;
-    Ok(output.stdout)
+
+    let licenses: Vec<BTreeMap<String, serde_json::Value>> = serde_json::from_str(&output.stdout)?;
+
+    let filtered: Vec<BTreeMap<String, serde_json::Value>> = licenses
+        .into_iter()
+        .map(|mut entry| {
+            entry.remove("version");
+            entry
+        })
+        .collect();
+
+    Ok(serde_json::to_string_pretty(&filtered)?)
 }

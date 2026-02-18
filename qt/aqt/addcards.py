@@ -8,7 +8,7 @@ from collections.abc import Callable
 import aqt.editor
 import aqt.forms
 from anki._legacy import deprecated
-from anki.collection import OpChanges, SearchNode
+from anki.collection import OpChanges, OpChangesWithCount, SearchNode
 from anki.decks import DeckId
 from anki.models import NotetypeId
 from anki.notes import Note, NoteFieldsCheckResult, NoteId
@@ -21,7 +21,6 @@ from aqt.qt import *
 from aqt.sound import av_player
 from aqt.utils import (
     HelpPage,
-    add_close_shortcut,
     ask_user_dialog,
     askUser,
     downArrow,
@@ -49,7 +48,6 @@ class AddCards(QMainWindow):
         self.setMinimumWidth(400)
         self.setup_choosers()
         self.setupEditor()
-        add_close_shortcut(self)
         self._load_new_note()
         self.setupButtons()
         self.history: list[NoteId] = []
@@ -289,18 +287,22 @@ class AddCards(QMainWindow):
     def _add_current_note(self) -> None:
         note = self.editor.note
 
+        # Prevent adding a note that has already been added (e.g., from double-clicking)
+        if note.id != 0:
+            return
+
         if not self._note_can_be_added(note):
             return
 
         target_deck_id = self.deck_chooser.selected_deck_id
 
-        def on_success(changes: OpChanges) -> None:
+        def on_success(changes: OpChangesWithCount) -> None:
             # only used for detecting changed sticky fields on close
             self._last_added_note = note
 
             self.addHistory(note)
 
-            tooltip(tr.adding_added(), period=500)
+            tooltip(tr.importing_cards_added(count=changes.count), period=500)
             av_player.stop_and_clear_queue()
             self._load_new_note(sticky_fields_from=note)
             gui_hooks.add_cards_did_add_note(note)

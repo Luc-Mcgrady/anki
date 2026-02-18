@@ -443,9 +443,20 @@ impl Collection {
             .storage
             .get_deck(card.deck_id)?
             .or_not_found(card.deck_id)?;
-        let config = self.home_deck_config(deck.config_id(), card.original_deck_id)?;
+        let home_deck = if card.original_deck_id.0 == 0 {
+            &deck
+        } else {
+            &self
+                .storage
+                .get_deck(card.original_deck_id)?
+                .or_not_found(card.original_deck_id)?
+        };
+        let config = self
+            .storage
+            .get_deck_config(home_deck.config_id().or_invalid("home deck is filtered")?)?
+            .unwrap_or_default();
 
-        let desired_retention = deck.effective_desired_retention(&config);
+        let desired_retention = home_deck.effective_desired_retention(&config);
         let fsrs_enabled = self.get_config_bool(BoolKey::Fsrs);
         let fsrs_next_states = if fsrs_enabled {
             let params = config.fsrs_params();
@@ -488,6 +499,9 @@ impl Collection {
             let params = config.fsrs_params();
             if params.len() >= 19 {
                 params[17] > 0.0 && params[18] > 0.0
+            } else if params.is_empty() {
+                // fallback to true when using default params
+                true
             } else {
                 false
             }

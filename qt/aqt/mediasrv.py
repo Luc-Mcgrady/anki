@@ -170,13 +170,42 @@ def favicon() -> Response:
 
 def _mime_for_path(path: str) -> str:
     "Mime type for provided path/filename."
-    if path.endswith(".css"):
-        # some users may have invalid mime type in the Windows registry
-        return "text/css"
-    elif path.endswith(".js") or path.endswith(".mjs"):
-        return "application/javascript"
+
+    _, ext = os.path.splitext(path)
+    ext = ext.lower()
+
+    # Badly-behaved apps on Windows can alter the standard mime types in the registry, which can completely
+    # break Anki's UI. So we hard-code the most common extensions.
+    mime_types = {
+        ".css": "text/css",
+        ".js": "application/javascript",
+        ".mjs": "application/javascript",
+        ".html": "text/html",
+        ".htm": "text/html",
+        ".svg": "image/svg+xml",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+        ".ico": "image/x-icon",
+        ".json": "application/json",
+        ".woff": "font/woff",
+        ".woff2": "font/woff2",
+        ".ttf": "font/ttf",
+        ".otf": "font/otf",
+        ".mp3": "audio/mpeg",
+        ".mp4": "video/mp4",
+        ".webm": "video/webm",
+        ".ogg": "audio/ogg",
+        ".pdf": "application/pdf",
+        ".txt": "text/plain",
+    }
+
+    if mime := mime_types.get(ext):
+        return mime
     else:
-        # autodetect
+        # fallback to mimetypes, which may consult the registry
         mime, _encoding = mimetypes.guess_type(path)
         return mime or "application/octet-stream"
 
@@ -483,7 +512,7 @@ def update_deck_configs() -> bytes:
             update.abort = True
 
     def on_success(changes: OpChanges) -> None:
-        if isinstance(window := aqt.mw.app.activeWindow(), DeckOptionsDialog):
+        if isinstance(window := aqt.mw.app.activeModalWidget(), DeckOptionsDialog):
             window.reject()
 
     def handle_on_main() -> None:
@@ -511,7 +540,7 @@ def set_scheduling_states() -> bytes:
 
 def import_done() -> bytes:
     def update_window_modality() -> None:
-        if window := aqt.mw.app.activeWindow():
+        if window := aqt.mw.app.activeModalWidget():
             from aqt.import_export.import_dialog import ImportDialog
 
             if isinstance(window, ImportDialog):
@@ -529,7 +558,7 @@ def import_request(endpoint: str) -> bytes:
     response.ParseFromString(output)
 
     def handle_on_main() -> None:
-        window = aqt.mw.app.activeWindow()
+        window = aqt.mw.app.activeModalWidget()
         on_op_finished(aqt.mw, response, window)
 
     aqt.mw.taskman.run_on_main(handle_on_main)
@@ -569,7 +598,7 @@ def change_notetype() -> bytes:
     data = request.data
 
     def handle_on_main() -> None:
-        window = aqt.mw.app.activeWindow()
+        window = aqt.mw.app.activeModalWidget()
         if isinstance(window, ChangeNotetypeDialog):
             window.save(data)
 
@@ -579,7 +608,7 @@ def change_notetype() -> bytes:
 
 def deck_options_require_close() -> bytes:
     def handle_on_main() -> None:
-        window = aqt.mw.app.activeWindow()
+        window = aqt.mw.app.activeModalWidget()
         if isinstance(window, DeckOptionsDialog):
             window.require_close()
 
@@ -591,11 +620,20 @@ def deck_options_require_close() -> bytes:
 
 def deck_options_ready() -> bytes:
     def handle_on_main() -> None:
-        window = aqt.mw.app.activeWindow()
+        window = aqt.mw.app.activeModalWidget()
         if isinstance(window, DeckOptionsDialog):
             window.set_ready()
 
     aqt.mw.taskman.run_on_main(handle_on_main)
+    return b""
+
+
+def save_custom_colours() -> bytes:
+    colors = [
+        QColorDialog.customColor(i).name(QColor.NameFormat.HexRgb)
+        for i in range(QColorDialog.customCount())
+    ]
+    aqt.mw.col.set_config("customColorPickerPalette", colors)
     return b""
 
 
@@ -614,12 +652,14 @@ post_handler_list = [
     search_in_browser,
     deck_options_require_close,
     deck_options_ready,
+    save_custom_colours,
 ]
 
 
 exposed_backend_list = [
     # CollectionService
     "latest_progress",
+    "get_custom_colours",
     # DeckService
     "get_deck_names",
     # I18nService

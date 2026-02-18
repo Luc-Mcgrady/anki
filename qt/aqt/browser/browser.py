@@ -60,7 +60,6 @@ from aqt.undo import UndoActionsInfo
 from aqt.utils import (
     HelpPage,
     KeyboardModifiersPressed,
-    add_close_shortcut,
     add_ellipsis_to_action_label,
     current_window,
     ensure_editor_saved,
@@ -521,7 +520,7 @@ class Browser(QMainWindow):
         self.search()
 
     def current_search(self) -> str:
-        return self._line_edit().text()
+        return self._line_edit().text().replace("\n", " ")
 
     def search(self) -> None:
         """Search triggered programmatically. Caller must have saved note first."""
@@ -1123,8 +1122,6 @@ class Browser(QMainWindow):
         dialog.setWindowTitle(tr.actions_grade_now())
         layout = QHBoxLayout()
         dialog.setLayout(layout)
-        add_close_shortcut(dialog)
-
         # Add grade buttons
         for ease, label in [
             (1, tr.studying_again()),
@@ -1133,15 +1130,16 @@ class Browser(QMainWindow):
             (4, tr.studying_easy()),
         ]:
             btn = QPushButton(label)
+
+            def cb(ease: int) -> None:
+                grade_now(
+                    parent=self, card_ids=self.selected_cards(), ease=ease
+                ).run_in_background()
+                dialog.accept()
+
             qconnect(
                 btn.clicked,
-                functools.partial(
-                    grade_now,
-                    parent=self,
-                    card_ids=self.selected_cards(),
-                    ease=ease,
-                    dialog=dialog,
-                ),
+                functools.partial(cb, ease=ease),
             )
             if key := aqt.mw.pm.get_answer_key(ease):
                 QShortcut(key, dialog, activated=btn.click)  # type: ignore

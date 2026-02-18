@@ -28,7 +28,6 @@ from aqt.qt import (
     qconnect,
 )
 from aqt.utils import (
-    add_close_shortcut,
     ask_user_dialog,
     disable_help_button,
     show_warning,
@@ -73,7 +72,7 @@ def handle_sync_error(mw: aqt.main.AnkiQt, err: Exception) -> None:
     elif isinstance(err, Interrupted):
         # no message to show
         return
-    show_warning(str(err))
+    show_warning(str(err), parent=mw)
 
 
 def on_normal_sync_timer(mw: aqt.main.AnkiQt) -> None:
@@ -209,11 +208,20 @@ def on_full_sync_timer(mw: aqt.main.AnkiQt, label: str) -> None:
         return
     sync_progress = progress.full_sync
 
+    # If we've reached total, show the "checking" label
     if sync_progress.transferred == sync_progress.total:
         label = tr.sync_checking()
+
+    total = sync_progress.total
+    transferred = sync_progress.transferred
+
+    # Scale both to kilobytes with floor division
+    max_for_bar = total // 1024
+    value_for_bar = transferred // 1024
+
     mw.progress.update(
-        value=sync_progress.transferred,
-        max=sync_progress.total,
+        value=value_for_bar,
+        max=max_for_bar,
         process=False,
         label=label,
     )
@@ -382,7 +390,6 @@ def get_id_and_pass_from_user(
     qconnect(bb.accepted, diag.accept)
     qconnect(bb.rejected, diag.reject)
     vbox.addWidget(bb)
-    add_close_shortcut(diag)
     diag.setLayout(vbox)
     diag.adjustSize()
     diag.show()
