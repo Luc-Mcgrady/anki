@@ -33,8 +33,9 @@ struct GraphsContext {
 
 impl Collection {
     fn graph_context(&mut self, search: &str, days: u32) -> Result<GraphsContext> {
+        let guard = self.search_cards_into_table(search, SortMode::NoOrder)?;
         let all = search.trim().is_empty();
-        let timing = self.timing_today()?;
+        let timing = guard.col.timing_today()?;
         let revlog_start = if days > 0 {
             timing
                 .next_day_at
@@ -42,18 +43,20 @@ impl Collection {
         } else {
             TimestampSecs(0)
         };
-        let offset = self.local_utc_offset_for_user()?;
+        let offset = guard.col.local_utc_offset_for_user()?;
         let local_offset_secs = offset.local_minus_utc() as i64;
         let revlog = if all {
-            self.storage.get_all_revlog_entries(revlog_start)?
+            guard.col.storage.get_all_revlog_entries(revlog_start)?
         } else {
-            self.storage
+            guard
+                .col
+                .storage
                 .get_revlog_entries_for_searched_cards_after_stamp(revlog_start)?
         };
         Ok(GraphsContext {
             revlog,
             days_elapsed: timing.days_elapsed,
-            cards: self.storage.all_searched_cards()?,
+            cards: guard.col.storage.all_searched_cards()?,
             next_day_start: timing.next_day_at,
             local_offset_secs,
         })
@@ -65,8 +68,7 @@ impl Collection {
         days: u32,
     ) -> Result<anki_proto::stats::GraphsResponse> {
         let ctx = self.graph_context(search, days)?;
-        let guard = self.search_cards_into_table(search, SortMode::NoOrder)?;
-        guard.col.graph_data(ctx)
+        self.graph_data(ctx)
     }
 
     fn graph_data(&mut self, ctx: GraphsContext) -> Result<anki_proto::stats::GraphsResponse> {
