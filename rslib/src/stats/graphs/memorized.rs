@@ -34,18 +34,24 @@ impl MemorizedContext {
             .ok()
         });
 
-        let memory_states = items.into_iter().filter_map(|item| {
-            item.map(|item| {
-                (
-                    item.filtered_revlogs,
-                    fsrs.historical_memory_states(item.item, item.starting_state),
-                )
-            })
-        });
+        let items = items
+            .filter(|item| item.is_some())
+            .map(|item| item.unwrap())
+            .collect_vec();
+        let starting_states = items
+            .iter()
+            .map(|item| item.starting_state.clone())
+            .collect_vec();
+        let filtered_revlogs = items
+            .iter()
+            .map(|item| item.filtered_revlogs.clone())
+            .collect_vec();
+        let items = items.into_iter().map(|item| item.item).collect_vec();
+        let memory_states = fsrs.historical_memory_state_batch(items, Some(starting_states))?;
+        let memory_states = izip![filtered_revlogs, memory_states];
 
         let mut retention = HashMap::new();
         for (revlogs, memory_states) in memory_states {
-            let memory_states = memory_states?;
             for (from_to, memory_state) in izip!(
                 revlogs
                     .into_iter()
