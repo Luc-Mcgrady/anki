@@ -1,7 +1,7 @@
 // Copyright: Ankitects Pty Ltd and contributors
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
-mod added;
+// mod added;
 mod buttons;
 mod card_counts;
 mod eases;
@@ -15,6 +15,8 @@ mod reviews;
 mod today;
 
 use std::collections::HashMap;
+
+use anki_proto::stats::graphs_response::Added;
 
 use crate::config::BoolKey;
 use crate::config::Weekday;
@@ -73,8 +75,17 @@ impl Collection {
 
     fn graph_data(&mut self, ctx: GraphsContext) -> Result<anki_proto::stats::GraphsResponse> {
         let (eases, difficulty) = ctx.eases();
+
+        let ctx = MemorizedContext {
+            graph_context: ctx,
+            per_preset_fsrs: HashMap::new(),
+        };
+        let memorized = {
+            Added { added: ctx.historical_fsrs()? }
+        };
+        let ctx = ctx.graph_context;
         let resp = anki_proto::stats::GraphsResponse {
-            added: Some(ctx.added_days()),
+            added: Some(memorized),
             reviews: Some(ctx.review_counts_and_times()),
             true_retention: Some(ctx.calculate_true_retention()),
             future_due: Some(ctx.future_due()),

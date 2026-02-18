@@ -17,7 +17,7 @@ pub(crate) struct MemorizedContext {
 }
 
 impl MemorizedContext {
-    pub fn historical_fsrs(&self) -> Result<HashMap<usize, f32>> {
+    pub fn historical_fsrs(&self) -> Result<HashMap<i32, f32>> {
         let gctx = &self.graph_context;
         let fsrs = FSRS::new(Some(&DEFAULT_PARAMETERS)).unwrap();
 
@@ -64,8 +64,8 @@ impl MemorizedContext {
                 let start_day = from_to[1];
                 let end_day = from_to[0];
                 for i in start_day..end_day {
-                    *retention.entry(i).or_default() +=
-                        fsrs.current_retrievability(memory_state, i as u32, 0.2);
+                    *retention.entry(-(i as i32)).or_default() +=
+                        fsrs.current_retrievability(memory_state, (i - start_day) as u32, 0.2);
                 }
             }
         }
