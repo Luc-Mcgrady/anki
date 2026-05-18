@@ -71,7 +71,11 @@ impl Card {
         self.remove_from_filtered_deck_before_reschedule();
         self.interval = interval;
         self.due = due;
-        self.ctype = CardType::Review;
+        self.ctype = if interval != 0 {
+            CardType::Review
+        } else {
+            CardType::Learn
+        };
         self.queue = CardQueue::Review;
         if self.ease_factor == 0 {
             // unlike the old Python code, we leave the ease factor alone
