@@ -36,11 +36,8 @@ impl Card {
     ) {
         let new_due = (today + days_from_today) as i32;
         let new_interval = if fsrs_enabled {
-            // Don't set the interval if the card is new or if the card has an interval of 0
-            // (to prevent the interval changing if set due date is used several times in a
-            // row on a new card.)
-            if self.queue == CardQueue::New || self.interval == 0 {
-                0
+            if self.ctype == CardType::New {
+                days_from_today.max(1)
             } else if let Some(last_review_time) = self.last_review_time {
                 let elapsed_days =
                     TimestampSecs(next_day_start).elapsed_days_since(last_review_time);
@@ -62,20 +59,21 @@ impl Card {
             self.interval.max(1)
         };
         let ease_factor = (ease_factor * 1000.0).round() as u16;
+        let ctype = if self.ctype == CardType::New && fsrs_enabled {
+            CardType::New
+        } else {
+            CardType::Review
+        };
 
-        self.schedule_as_review(new_interval, new_due, ease_factor);
+        self.schedule_as_review(new_interval, new_due, ease_factor, ctype);
     }
 
-    fn schedule_as_review(&mut self, interval: u32, due: i32, ease_factor: u16) {
+    fn schedule_as_review(&mut self, interval: u32, due: i32, ease_factor: u16, ctype: CardType) {
         self.original_position = self.last_position();
         self.remove_from_filtered_deck_before_reschedule();
         self.interval = interval;
         self.due = due;
-        self.ctype = if interval != 0 {
-            CardType::Review
-        } else {
-            CardType::Learn
-        };
+        self.ctype = ctype;
         self.queue = CardQueue::Review;
         if self.ease_factor == 0 {
             // unlike the old Python code, we leave the ease factor alone

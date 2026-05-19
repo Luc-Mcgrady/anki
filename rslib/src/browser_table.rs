@@ -508,7 +508,7 @@ impl RowContext {
     fn card_due_str(&self) -> String {
         let due = if self.cards[0].is_filtered_deck() {
             self.tr.browsing_filtered()
-        } else if self.cards[0].is_new_type_or_queue() {
+        } else if self.cards[0].queue == CardQueue::New {
             self.tr.statistics_due_for_new_card(self.cards[0].due)
         } else if let Some(time) = self.cards[0].due_time(&self.timing) {
             time.date_string().into()

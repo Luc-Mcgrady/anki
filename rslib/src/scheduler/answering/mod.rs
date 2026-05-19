@@ -463,9 +463,7 @@ impl Collection {
             let params = config.fsrs_params();
             let fsrs = FSRS::new(Some(params))?;
             card.decay = Some(get_decay_from_params(params));
-            // card.interval != 0 is for when the card has been modified by set due date
-            // while it is new.
-            if card.memory_state.is_none() && card.ctype != CardType::New && card.interval != 0 {
+            if card.memory_state.is_none() && card.ctype != CardType::New {
                 // Card has been moved or imported into an FSRS deck after params were set,
                 // and will need its initial memory state to be calculated based on review
                 // history.
