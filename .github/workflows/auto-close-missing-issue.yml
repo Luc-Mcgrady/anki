@@ -30,20 +30,15 @@ jobs:
             for (const pr of prs) {
               if (!pr.pull_request) continue;
 
+              const authorAssociation = pr.author_association;
+              const isCollaborator = ['COLLABORATOR', 'OWNER', 'MEMBER'].includes(authorAssociation);
               const isExempt =
+                isCollaborator ||
                 pr.labels.some(l => l.name === 'hotfix') ||
                 pr.user.login === 'dependabot[bot]' ||
                 pr.labels.some(l => l.name === 'dependencies');
 
               if (isExempt) continue;
-
-              const isCollaborator = await github.rest.repos.checkCollaborator({
-                owner,
-                repo,
-                username: pr.user.login,
-              }).then(() => true).catch(() => false);
-
-              if (isCollaborator) continue;
 
               // Find when the missing-issue label was applied
               const events = await github.paginate(github.rest.issues.listEventsForTimeline, {

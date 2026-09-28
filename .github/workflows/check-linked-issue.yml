@@ -22,12 +22,8 @@ jobs:
             const author = pr.user.login;
             const labels = pr.labels.map(l => l.name);
 
-            const isCollaborator = await github.rest.repos.checkCollaborator({
-              owner,
-              repo,
-              username: author,
-            }).then(() => true).catch(() => false);
-
+            const authorAssociation = github.context.payload.pull_request.author_association;
+            const isCollaborator = ['COLLABORATOR', 'OWNER', 'MEMBER'].includes(authorAssociation);
             const isExempt =
               isCollaborator ||
               labels.includes('hotfix') ||
