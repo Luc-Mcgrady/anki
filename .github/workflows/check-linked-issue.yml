@@ -23,7 +23,7 @@ jobs:
             const labels = pr.labels.map(l => l.name);
 
             const authorAssociation = github.context.payload.pull_request.author_association;
-            const isCollaborator = ['COLLABORATOR', 'OWNER', 'MEMBER'].includes(authorAssociation);
+            const isCollaborator = ['COLLABORATOR', 'MEMBER'].includes(authorAssociation);
             const isExempt =
               isCollaborator ||
               labels.includes('hotfix') ||

@@ -31,7 +31,7 @@ jobs:
               if (!pr.pull_request) continue;
 
               const authorAssociation = pr.author_association;
-              const isCollaborator = ['COLLABORATOR', 'OWNER', 'MEMBER'].includes(authorAssociation);
+              const isCollaborator = ['COLLABORATOR', 'MEMBER'].includes(authorAssociation);
               const isExempt =
                 isCollaborator ||
                 pr.labels.some(l => l.name === 'hotfix') ||
